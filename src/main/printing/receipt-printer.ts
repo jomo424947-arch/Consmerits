@@ -177,35 +177,60 @@ export class ReceiptPrinter {
    */
   async printSaleReceipt(sale: Sale): Promise<boolean> {
     try {
-      const html = this.generateReceiptHtml(sale);
+      const config = this.getReceiptConfig();
+      const html = this.generateReceiptHtml(sale, config);
 
       // في بيئة Electron
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { BrowserWindow } = require('electron');
-      if (BrowserWindow) {
-        const printWindow = new BrowserWindow({
-          show: false,
-          webPreferences: { nodeIntegration: false },
-        });
-
-        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
-        return new Promise<boolean>((resolve) => {
-          printWindow.webContents.print(
-            {
-              silent: true,
-              printBackground: true,
-            },
-            (success: boolean) => {
-              printWindow.close();
-              resolve(success);
-            }
-          );
-        });
+      if (!BrowserWindow) {
+        return true;
       }
-      return true;
+
+      const printWindow = new BrowserWindow({
+        show: false,
+        width: 400,
+        height: 800,
+        webPreferences: { nodeIntegration: false },
+      });
+
+      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+      // انتظار اكتمال تحميل وتنسيق الصفحة
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const widthMicrons = (config.widthMm || 80) * 1000;
+
+      return new Promise<boolean>((resolve) => {
+        printWindow.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            margins: { marginType: 'none' },
+            pageSize: {
+              width: widthMicrons,
+              height: 297000,
+            },
+          },
+          (success: boolean, failureReason: string) => {
+            if (!success) {
+              console.warn('Silent receipt print fallback, reason:', failureReason);
+              printWindow.webContents.print(
+                { silent: false, printBackground: true },
+                (fallbackSuccess: boolean) => {
+                  printWindow.close();
+                  resolve(fallbackSuccess);
+                }
+              );
+              return;
+            }
+            printWindow.close();
+            resolve(success);
+          }
+        );
+      });
     } catch (err) {
-      console.warn('تعذر الاتصال بالطابعة المباشرة (ربما بيئة اختبارات):', err);
+      console.warn('تعذر الاتصال بالطابعة المباشرة:', err);
       return true;
     }
   }

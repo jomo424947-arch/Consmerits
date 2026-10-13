@@ -122,36 +122,64 @@ export class BarcodePrinter {
   /**
    * طباعة ملصقات الباركود
    */
-  async printLabels(labels: BarcodeLabelData[]): Promise<boolean> {
+  async printLabels(
+    labels: BarcodeLabelData[],
+    labelWidthMm = 38,
+    labelHeightMm = 25
+  ): Promise<boolean> {
     try {
-      const html = this.generateLabelsHtml(labels);
+      const html = this.generateLabelsHtml(labels, labelWidthMm, labelHeightMm);
 
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { BrowserWindow } = require('electron');
-      if (BrowserWindow) {
-        const printWindow = new BrowserWindow({
-          show: false,
-          webPreferences: { nodeIntegration: false },
-        });
-
-        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
-        return new Promise<boolean>((resolve) => {
-          printWindow.webContents.print(
-            {
-              silent: true,
-              printBackground: true,
-            },
-            (success: boolean) => {
-              printWindow.close();
-              resolve(success);
-            }
-          );
-        });
+      if (!BrowserWindow) {
+        return true;
       }
-      return true;
-    } catch {
-      return true;
+
+      const printWindow = new BrowserWindow({
+        show: false,
+        width: 400,
+        height: 600,
+        webPreferences: { nodeIntegration: false },
+      });
+
+      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+
+      // انتظار اكتمال الـ layout والريندر لمنع خطأ empty printable area
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      return new Promise<boolean>((resolve) => {
+        printWindow.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            margins: { marginType: 'none' },
+            pageSize: {
+              width: labelWidthMm * 1000,
+              height: labelHeightMm * 1000,
+            },
+          },
+          (success: boolean, failureReason: string) => {
+            if (!success) {
+              console.warn('Silent barcode label print fallback, reason:', failureReason);
+              // محاولة الطباعة بمربع الحوار في حال رفض السائق الأوامر الصامتة
+              printWindow.webContents.print(
+                { silent: false, printBackground: true },
+                (fallbackSuccess: boolean) => {
+                  printWindow.close();
+                  resolve(fallbackSuccess);
+                }
+              );
+              return;
+            }
+            printWindow.close();
+            resolve(success);
+          }
+        );
+      });
+    } catch (err) {
+      console.error('Barcode printer error:', err);
+      return false;
     }
   }
 }
