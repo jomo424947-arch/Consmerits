@@ -1,0 +1,133 @@
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import Database from 'better-sqlite3';
+import { runMigrations } from '../../src/main/db/migrator';
+import { ProductsService } from '../../src/main/services/products.service';
+
+describe('ProductsService', () => {
+  let db: Database.Database;
+  let productsService: ProductsService;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    runMigrations(db);
+    productsService = new ProductsService(db);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  test('توليد باركود داخلي EAN-13 قياسي بالبادئة 200 وزيادة العداد', async () => {
+    const barcode1 = await productsService.generateInternalBarcode();
+    const barcode2 = await productsService.generateInternalBarcode();
+
+    expect(barcode1.startsWith('200')).toBe(true);
+    expect(barcode2.startsWith('200')).toBe(true);
+    expect(barcode1.length).toBe(13);
+    expect(barcode2.length).toBe(13);
+    expect(barcode1).not.toBe(barcode2);
+  });
+
+  test('إنشاء منتج كامل مع variants و barcodes والبحث عنه بالباركود', async () => {
+    const categoryId = productsService.getOrCreateCategory('العناية بالبشرة');
+    const brandId = productsService.getOrCreateBrand('L\'Oreal');
+
+    const product = await productsService.createProduct({
+      name_ar: 'سيروم هيالورونيك أسيد',
+      name_en: 'Hyaluronic Acid Serum',
+      category_id: categoryId,
+      brand_id: brandId,
+      unit: 'عبوة',
+      variants: [
+        {
+          variant_name: '30ml',
+          sku: 'HYAL-30',
+          cost_price: 15000,
+          selling_price: 25000,
+          min_stock_level: 5,
+          barcodes: ['6221234567890'],
+        },
+        {
+          variant_name: '50ml',
+          sku: 'HYAL-50',
+          cost_price: 22000,
+          selling_price: 36000,
+          min_stock_level: 3,
+          barcodes: ['6221234567891'],
+        },
+      ],
+    });
+
+    expect(product.id).toBeDefined();
+    expect(product.name_ar).toBe('سيروم هيالورونيك أسيد');
+    expect(product.category_name).toBe('العناية بالبشرة');
+    expect(product.brand_name).toBe("L'Oreal");
+    expect(product.variants.length).toBe(2);
+    expect(product.variants[0].barcodes).toContain('6221234567890');
+
+    // فحص البحث بالباركود المخصص لنقطة البيع POS
+    const lookup = await productsService.getProductByBarcode('6221234567890');
+    expect(lookup).not.toBeNull();
+    expect(lookup?.product.id).toBe(product.id);
+    expect(lookup?.variant.variant_name).toBe('30ml');
+    expect(lookup?.variant.selling_price).toBe(25000);
+    expect(lookup?.matched_barcode).toBe('6221234567890');
+  });
+
+  test('البحث النصي المركب بالاسم والـ SKU', async () => {
+    await productsService.createProduct({
+      name_ar: 'أحمر شفاه مطفي',
+      name_en: 'Matte Lipstick',
+      variants: [
+        {
+          variant_name: 'أحمر كلاسيكي',
+          sku: 'LIP-RED-01',
+          selling_price: 12000,
+          barcodes: ['1122334455667'],
+        },
+      ],
+    });
+
+    // بحث بالاسم العربي
+    const searchAr = await productsService.searchProducts('شفاه');
+    expect(searchAr.length).toBe(1);
+
+    // بحث بالـ SKU
+    const searchSku = await productsService.searchProducts('LIP-RED');
+    expect(searchSku.length).toBe(1);
+
+    // بحث بالباركود
+    const searchBarcode = await productsService.searchProducts('1122334455667');
+    expect(searchBarcode.length).toBe(1);
+
+    // بحث غير مطابق
+    const searchEmpty = await productsService.searchProducts('غير موجود');
+    expect(searchEmpty.length).toBe(0);
+  });
+
+  test('تحديث الأسعار بالجملة bulkUpdate', async () => {
+    const product = await productsService.createProduct({
+      name_ar: 'كريم مرطب',
+      variants: [
+        {
+          variant_name: 'حجم عادي',
+          selling_price: 10000, // 100 ج.م
+          barcodes: ['9988776655443'],
+        },
+      ],
+    });
+
+    // زيادة بنسبة 10%
+    await productsService.bulkUpdate({
+      product_ids: [product.id],
+      price_adjustment: {
+        type: 'percentage',
+        value: 10,
+      },
+    });
+
+    const updated = productsService.getProductDetails(product.id);
+    expect(updated.variants[0].selling_price).toBe(11000); // 110 ج.م
+  });
+});

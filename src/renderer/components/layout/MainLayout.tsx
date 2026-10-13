@@ -1,0 +1,104 @@
+import React, { useEffect } from 'react';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import { StatusBar } from './StatusBar';
+import type { NavTab } from '../../App';
+import { SafeUser } from '../../../shared/types/users.types';
+import { sounds } from '../../lib/sounds';
+
+interface MainLayoutProps {
+  activeTab: NavTab;
+  onSelectTab: (tab: NavTab) => void;
+  currentUser?: SafeUser | null;
+  onLogout?: () => void;
+  children: React.ReactNode;
+}
+
+const tabTitles: Record<NavTab, string> = {
+  pos: 'شاشة البيع ونقطة الكاشير',
+  products: 'إدارة المنتجات والأصناف والباركود',
+  inventory: 'إدارة المخزون وتواريخ الصلاحية (FEFO)',
+  purchases: 'المشتريات وفواتير الموردين',
+  returns: 'المرتجعات واستبدال المنتجات',
+  cash: 'الخزنة وإدارة الورديات والمصروفات',
+  reports: 'التقارير والإحصائيات ولوحة التحكم',
+  settings: 'إعدادات النظام والمستخدمين والنسخ الاحتياطي',
+};
+
+const hotkeyMap: Record<string, NavTab> = {
+  F1: 'pos',
+  F2: 'products',
+  F3: 'inventory',
+  F4: 'purchases',
+  F5: 'returns',
+  F6: 'cash',
+  F7: 'reports',
+  F8: 'settings',
+};
+
+export function MainLayout({
+  activeTab,
+  onSelectTab,
+  currentUser,
+  onLogout,
+  children,
+}: MainLayoutProps): React.ReactElement {
+  // تفعيل اختصارات لوحة المفاتيح العامة (F1 - F8 للتبويب، F12 للقفل)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // تجنب تشويش الاختصارات أثناء إدخال نصوص في بعض الحقول إذا دعت الحاجة
+      if (hotkeyMap[e.key]) {
+        e.preventDefault();
+        sounds.playClick();
+        onSelectTab(hotkeyMap[e.key]);
+      } else if (e.key === 'F12') {
+        e.preventDefault();
+        sounds.playWarning();
+        const electron = (window as any).electron;
+        electron?.lockScreen?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onSelectTab]);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        backgroundColor: 'var(--bg-app)',
+      }}
+    >
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Header title={tabTitles[activeTab]} />
+
+        <main
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: 20,
+            backgroundColor: 'var(--bg-app)',
+            position: 'relative',
+          }}
+        >
+          {children}
+        </main>
+
+        <StatusBar />
+      </div>
+    </div>
+  );
+}
+
+export default MainLayout;
