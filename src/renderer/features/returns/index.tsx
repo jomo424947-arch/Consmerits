@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
   Plus,
@@ -7,108 +7,149 @@ import {
   AlertCircle,
   FileText,
   DollarSign,
+  RefreshCw,
+  Package,
 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
 import { GlassIcon } from '../../components/common/GlassIcon';
-import { EmptyState } from '../../components/common/EmptyState';
 import { formatMoney } from '../../../shared/utils/money';
 import { sounds } from '../../lib/sounds';
 import { useToast } from '../../components/common/ToastContext';
 import { MESSAGES } from '../../lib/messages';
-
-interface ReturnRecord {
-  id: number;
-  returnNo: string;
-  originalInvoiceNo: string;
-  productName: string;
-  qty: number;
-  refundAmount: number;
-  reason: string;
-  method: string;
-  date: string;
-  actor: string;
-}
+import { ReturnInvoice, RefundMethod, ReturnItemCondition } from '../../../shared/types/returns.types';
 
 export function ReturnsScreen(): React.ReactElement {
   const { success: toastSuccess, error: toastError } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // قائمة المرتجعات الحقيقية
+  const [returns, setReturns] = useState<ReturnInvoice[]>([]);
+  const [salesList, setSalesList] = useState<any[]>([]);
 
   // حقول تسجيل مرتجع جديد
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [productName, setProductName] = useState('');
-  const [qtyStr, setQtyStr] = useState('1');
-  const [refundStr, setRefundStr] = useState('');
+  const [selectedSaleId, setSelectedSaleId] = useState<number | ''>('');
+  const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
+  const [returnQty, setReturnQty] = useState<number>(1);
+  const [condition, setCondition] = useState<ReturnItemCondition>('good');
   const [reason, setReason] = useState('رغبة العميل (بدون عيب)');
-  const [refundMethod, setRefundMethod] = useState('نقداً من الدرج');
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>('cash');
 
-  const [returns, setReturns] = useState<ReturnRecord[]>([
-    {
-      id: 1,
-      returnNo: 'RET-101',
-      originalInvoiceNo: 'INV-1020',
-      productName: 'أحمر شفاه مات درجة 04',
-      qty: 1,
-      refundAmount: 14500,
-      reason: 'تبديل درجة اللون',
-      method: 'نقداً من الدرج',
-      date: '2026-10-12 14:10',
-      actor: 'كاشير المحل',
-    },
-    {
-      id: 2,
-      returnNo: 'RET-102',
-      originalInvoiceNo: 'INV-1015',
-      productName: 'ماسكارا مقاومة للماء',
-      qty: 1,
-      refundAmount: 9500,
-      reason: 'عيوب في العبوة',
-      method: 'نقداً من الدرج',
-      date: '2026-10-10 17:45',
-      actor: 'المدير',
-    },
-  ]);
+  const fetchReturnsData = async () => {
+    setIsLoading(true);
+    try {
+      const electron = (window as any).electron;
+      if (!electron) return;
 
-  const totalRefunded = returns.reduce((sum, r) => sum + r.refundAmount, 0);
+      // 1. جلب المرتجعات
+      if (electron.listReturns) {
+        const retRes = await electron.listReturns();
+        if (retRes?.success && Array.isArray(retRes.data)) {
+          setReturns(retRes.data);
+        } else {
+          setReturns([]);
+        }
+      }
 
-  const handleCreateReturn = (e: React.FormEvent) => {
+      // 2. جلب المبيعات المكتملة
+      if (electron.listSales) {
+        const salesRes = await electron.listSales({ limit: 50 });
+        if (salesRes?.success && Array.isArray(salesRes.data)) {
+          setSalesList(salesRes.data);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      toastError('تعذر تحميل بيانات المرتجعات');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReturnsData();
+  }, []);
+
+  // عند اختيار فاتورة مبيعات، جلب تفاصيل بنودها
+  const handleSaleSelect = async (saleId: number) => {
+    setSelectedSaleId(saleId);
+    try {
+      const electron = (window as any).electron;
+      const res = await electron.getSale(saleId);
+      if (res?.success && res.data) {
+        setSelectedSaleDetails(res.data);
+        if (res.data.items?.length > 0) {
+          setSelectedItemId(res.data.items[0].id);
+          setReturnQty(1);
+        }
+      }
+    } catch {
+      setSelectedSaleDetails(null);
+    }
+  };
+
+  const handleCreateReturn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const qty = parseInt(qtyStr, 10);
-    const refund = parseFloat(refundStr);
 
-    if (!invoiceNo.trim() || !productName.trim() || isNaN(qty) || isNaN(refund) || refund <= 0) {
+    if (!selectedSaleId || !selectedItemId || returnQty <= 0) {
       sounds.playError();
-      toastError('يرجى استكمال جميع بيانات الإرجاع بدقة');
+      toastError('يرجى تحديد فاتورة المبيعات والبند والكمية المراد إرجاعها');
       return;
     }
 
-    const newRecord: ReturnRecord = {
-      id: Date.now(),
-      returnNo: `RET-${returns.length + 103}`,
-      originalInvoiceNo: invoiceNo.trim(),
-      productName: productName.trim(),
-      qty,
-      refundAmount: Math.round(refund * 100),
-      reason,
-      method: refundMethod,
-      date: new Date().toLocaleString('ar-EG'),
-      actor: 'كاشير المحل',
-    };
+    try {
+      const electron = (window as any).electron;
+      const res = await electron.processReturn({
+        sale_id: Number(selectedSaleId),
+        user_id: 1,
+        refund_method: refundMethod,
+        reason: reason.trim() || undefined,
+        items: [
+          {
+            sale_item_id: Number(selectedItemId),
+            qty: returnQty,
+            condition,
+          },
+        ],
+      });
 
-    sounds.playDelete();
-    setReturns([newRecord, ...returns]);
-    toastSuccess(MESSAGES.RETURN_SUCCESS);
-    setIsModalOpen(false);
-    setInvoiceNo('');
-    setProductName('');
-    setRefundStr('');
+      if (res?.success) {
+        sounds.playSaleSuccess();
+        toastSuccess('تم تسجيل المرتجع بنجاح وتحديث المخزون');
+        setIsModalOpen(false);
+        setSelectedSaleId('');
+        setSelectedSaleDetails(null);
+        setSelectedItemId('');
+        setReturnQty(1);
+        fetchReturnsData();
+      } else {
+        throw new Error(res?.error || 'فشل معالجة المرتجع');
+      }
+    } catch (err: any) {
+      sounds.playError();
+      toastError(err.message || 'حدث خطأ أثناء معالجة المرتجع');
+    }
   };
+
+  const totalRefunded = returns.reduce((sum, r) => sum + (r.total_refund || 0), 0);
+
+  const filteredReturns = returns.filter((r) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      r.id.toString().includes(q) ||
+      r.sale_id.toString().includes(q) ||
+      r.reason?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, height: '100%' }}>
-      {/* بطاقات المؤشرات العلوية */}
+      {/* بطاقات الإحصائيات العلوية */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
@@ -117,7 +158,7 @@ export function ReturnsScreen(): React.ReactElement {
           <GlassIcon icon={RotateCcw} size="lg" variant="danger" glow />
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المبالغ المستردة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-danger)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#962B34' }}>
               {formatMoney(totalRefunded)}
             </div>
           </div>
@@ -127,11 +168,11 @@ export function ReturnsScreen(): React.ReactElement {
           className="glass-card"
           style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={FileText} size="lg" variant="gold" glow />
+          <GlassIcon icon={FileText} size="lg" variant="brand" glow />
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد عمليات الإرجاع</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {returns.length}
+              {returns.length} عملية
             </div>
           </div>
         </div>
@@ -142,9 +183,9 @@ export function ReturnsScreen(): React.ReactElement {
         >
           <GlassIcon icon={CheckCircle2} size="lg" variant="success" glow />
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>حالة استرجاع المخزون</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#21633D' }}>
-              معاد ومسوّى آلياً
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>سياسة الإرجاع والاستبدال</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#21633D' }}>
+              14 يوماً مع إرجاع فوري للمخزون
             </div>
           </div>
         </div>
@@ -161,29 +202,44 @@ export function ReturnsScreen(): React.ReactElement {
           backgroundColor: '#FFFFFF',
         }}
       >
-        <div style={{ width: 340 }}>
+        <div style={{ width: 320 }}>
           <Input
-            placeholder="بحث برقم الإشعار أو الفاتورة الأصلية..."
+            placeholder="بحث برقم المرتجع أو الفاتورة..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             icon={<Search size={15} />}
           />
         </div>
 
-        <Button
-          variant="danger"
-          onClick={() => {
-            sounds.playClick();
-            setIsModalOpen(true);
-          }}
-          style={{ height: 42, padding: '0 18px' }}
-        >
-          <Plus size={16} />
-          <span>تسجيل عملية إرجاع</span>
-        </Button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            variant="secondary"
+            onClick={() => fetchReturnsData()}
+            disabled={isLoading}
+            style={{ height: 42, padding: '0 14px' }}
+          >
+            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+          </Button>
+
+          <Button
+            variant="primary"
+            onClick={() => {
+              sounds.playClick();
+              if (salesList.length === 0) {
+                toastError('لا توجد فواتير مبيعات سابقة لإرجاعها');
+                return;
+              }
+              setIsModalOpen(true);
+            }}
+            style={{ height: 42, padding: '0 18px' }}
+          >
+            <Plus size={16} />
+            <span>تسجيل طلب مرتجع جديد</span>
+          </Button>
+        </div>
       </div>
 
-      {/* جدول سجلات المرتجعات */}
+      {/* جدول المرتجعات */}
       <div
         className="glass-card"
         style={{
@@ -195,161 +251,202 @@ export function ReturnsScreen(): React.ReactElement {
           flexDirection: 'column',
         }}
       >
-        {returns.length === 0 ? (
-          <EmptyState
-            icon={RotateCcw}
-            variant="danger"
-            title="لا توجد عمليات إرجاع مسجلة"
-            description="جميع المبيعات مؤكدة، لم يتم تسجيل أي إشعار استرجاع أو استبدال حتى الآن"
-          />
-        ) : (
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {filteredReturns.length === 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 48,
+                gap: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <RotateCcw size={42} opacity={0.4} />
+              <div style={{ fontSize: 15, fontWeight: 600 }}>لا توجد عمليات مرتجع مسجلة بعد</div>
+              <div style={{ fontSize: 12 }}>
+                عند إرجاع أي صنف مرتبط بفاتورة مبيعات، سيتم توثيقه وتعديل المخزون والخزنة آلياً هنا
+              </div>
+            </div>
+          ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
               <thead>
                 <tr style={{ background: '#FAFBF9', borderBottom: '1.5px solid var(--border-light)' }}>
-                  <th style={{ width: '6%', padding: '12px 16px', textAlign: 'center' }}>#</th>
-                  <th style={{ width: '14%', padding: '12px 16px' }}>رقم الإشعار</th>
-                  <th style={{ width: '16%', padding: '12px 16px' }}>الفاتورة الأصلية</th>
-                  <th style={{ width: '26%', padding: '12px 16px' }}>المنتج المرتجع</th>
-                  <th style={{ width: '14%', padding: '12px 16px', textAlign: 'left' }}>المبلغ المسترد</th>
-                  <th style={{ width: '14%', padding: '12px 16px' }}>طريقة الرد</th>
-                  <th style={{ width: '10%', padding: '12px 16px' }}>السبب</th>
+                  <th style={{ width: '8%', padding: '12px 16px', textAlign: 'center' }}>رقم المرتجع</th>
+                  <th style={{ width: '14%', padding: '12px 16px' }}>الفاتورة الأصلية</th>
+                  <th style={{ width: '16%', padding: '12px 16px' }}>تاريخ المرتجع</th>
+                  <th style={{ width: '16%', padding: '12px 16px', textAlign: 'left' }}>المبلغ المسترد</th>
+                  <th style={{ width: '14%', padding: '12px 16px', textAlign: 'center' }}>طريقة الرد</th>
+                  <th style={{ width: '32%', padding: '12px 16px' }}>سبب الإرجاع</th>
                 </tr>
               </thead>
               <tbody>
-                {returns.map((r, idx) => (
+                {filteredReturns.map((r) => (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                      {idx + 1}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--color-danger)' }}>
-                      {r.returnNo}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--color-brand-deep)' }}>
-                      {r.originalInvoiceNo}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          backgroundColor: 'rgba(235, 87, 87, 0.1)',
+                          color: '#C53030',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        RET-#{r.id}
+                      </span>
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: 600 }}>
-                      {r.productName} ({r.qty} قطعة)
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          backgroundColor: '#F0F3F1',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        فاتورة #{r.sale_id}
+                      </span>
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--color-danger)' }}>
-                      {formatMoney(r.refundAmount)}-
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+                      {r.created_at?.slice(0, 16)}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12 }}>
-                      <span className="badge badge-neutral">{r.method}</span>
+                    <td style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, fontSize: 14, color: '#962B34' }}>
+                      {formatMoney(r.total_refund)}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {r.reason}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span className="badge badge-neutral">
+                        {r.refund_method === 'cash' ? 'نقداً (كاش)' : r.refund_method === 'credit' ? 'رصيد دائن' : 'استبدال'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+                      {r.reason || 'بدون إبداء سبب'}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* نافذة تسجيل مرتجع جديد */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="تسجيل عملية إرجاع منتج ورد مبلغ"
+        title="تسجيل مرتجع مرتبط بفاتورة مبيعات"
         icon={<GlassIcon icon={RotateCcw} size="sm" variant="danger" />}
-        width={520}
+        width={540}
       >
         <form onSubmit={handleCreateReturn} style={{ display: 'flex', flexDirection: 'column', gap: 14, direction: 'rtl' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
+              اختر فاتورة المبيعات الأصلية *
+            </label>
+            <select
+              value={selectedSaleId}
+              onChange={(e) => handleSaleSelect(Number(e.target.value))}
+              className="in"
+              style={{ height: 44, width: '100%' }}
+              required
+            >
+              <option value="">-- اضغط لاختيار فاتورة البيع --</option>
+              {salesList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  فاتورة #{s.invoice_number || s.seq_no || s.id} - بتاريخ {s.created_at?.slice(0, 10)} - بقيمة {formatMoney(s.total)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedSaleDetails && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
+                اختر الصنف المراد إرجاعه من الفاتورة *
+              </label>
+              <select
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(Number(e.target.value))}
+                className="in"
+                style={{ height: 44, width: '100%' }}
+                required
+              >
+                {selectedSaleDetails.items?.map((it: any) => (
+                  <option key={it.id} value={it.id}>
+                    {it.product_name} {it.variant_name ? `(${it.variant_name})` : ''} - الكمية المباعة: {it.qty} - السعر: {formatMoney(it.unit_price)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-                رقم الفاتورة الأصلية *
+                الكمية المراد إرجاعها *
               </label>
               <Input
-                value={invoiceNo}
-                onChange={(e) => setInvoiceNo(e.target.value)}
-                placeholder="مثال: INV-1025"
+                type="number"
+                min="1"
+                value={returnQty.toString()}
+                onChange={(e) => setReturnQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
                 required
-                autoFocus
               />
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-                طريقة رد المبلغ *
+                حالة المنتج المرتجع *
               </label>
               <select
-                value={refundMethod}
-                onChange={(e) => setRefundMethod(e.target.value)}
+                value={condition}
+                onChange={(e) => setCondition(e.target.value as any)}
                 className="in"
-                style={{ height: 44 }}
+                style={{ height: 44, width: '100%' }}
               >
-                <option value="نقداً من الدرج">نقداً من الدرج</option>
-                <option value="استرجاع على البطاقة">استرجاع على البطاقة</option>
-                <option value="رصيد متجر للعميل">رصيد متجر للعميل</option>
+                <option value="good">سليم (يعود للمخزون الصالح)</option>
+                <option value="damaged">تالف / هالك (لا يعود للبيع)</option>
               </select>
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-              اسم المنتج المرتجع *
-            </label>
-            <Input
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              placeholder="مثال: كريم أساس سائل 30مل"
-              required
-            />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-                الكمية المرتجعة *
+                طريقة رد المبلغ للعميل *
               </label>
-              <Input
-                type="number"
-                value={qtyStr}
-                onChange={(e) => setQtyStr(e.target.value)}
-                placeholder="1"
-                required
-              />
+              <select
+                value={refundMethod}
+                onChange={(e) => setRefundMethod(e.target.value as any)}
+                className="in"
+                style={{ height: 44, width: '100%' }}
+              >
+                <option value="cash">نقداً من الدرج (كاش)</option>
+                <option value="credit">رصيد دائن للعميل</option>
+              </select>
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-                المبلغ المسترد للعميل (ج.م) *
+                سبب الإرجاع
               </label>
               <Input
-                type="number"
-                step="any"
-                value={refundStr}
-                onChange={(e) => setRefundStr(e.target.value)}
-                placeholder="مثال: 120.00"
-                required
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="مثال: تغيير درجة اللون"
               />
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-              سبب الإرجاع *
-            </label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="in"
-              style={{ height: 44 }}
-            >
-              <option value="رغبة العميل (بدون عيب)">رغبة العميل (بدون عيب)</option>
-              <option value="عيب في العبوة أو المنتج">عيب في العبوة أو المنتج</option>
-              <option value="خطأ في تسجيل الصنف من الكاشير">خطأ في تسجيل الصنف من الكاشير</option>
-              <option value="صلاحية قريبة أو منتهية">صلاحية قريبة أو منتهية</option>
-            </select>
-          </div>
-
           <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
-            <Button type="submit" variant="danger" style={{ flex: 1, height: 44 }}>
+            <Button type="submit" variant="primary" style={{ flex: 1, height: 44 }}>
               <CheckCircle2 size={16} />
-              <span>تأكيد الإرجاع وخصم المبلغ من الدرج</span>
+              <span>اعتماد المرتجع واسترداد القيمة</span>
             </Button>
             <Button
               type="button"

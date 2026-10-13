@@ -88,8 +88,24 @@ export function CartTable({
 
                 {/* اسم المنتج والصنف */}
                 <td style={{ padding: '12px 14px' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 14 }}>
-                    {item.productName}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 14 }}>
+                      {item.productName}
+                    </div>
+                    {item.availableStock !== undefined && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          backgroundColor: '#EAEFEA',
+                          color: '#21633D',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        المتاح: {item.availableStock}
+                      </span>
+                    )}
                   </div>
                   {item.variantName && (
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -148,18 +164,32 @@ export function CartTable({
                     <button
                       type="button"
                       onClick={() => onUpdateQty?.(item.id, item.qty + 1)}
-                      title="زيادة الكمية"
+                      disabled={item.availableStock !== undefined && item.qty >= item.availableStock}
+                      title={
+                        item.availableStock !== undefined && item.qty >= item.availableStock
+                          ? 'وصلت للحد الأقصى للمخزون المتوفر'
+                          : 'زيادة الكمية'
+                      }
                       style={{
                         width: 28,
                         height: 28,
                         borderRadius: 6,
                         border: '1px solid #D5DAD6',
-                        background: '#FFFFFF',
-                        cursor: 'pointer',
+                        background:
+                          item.availableStock !== undefined && item.qty >= item.availableStock
+                            ? '#F0F3F1'
+                            : '#FFFFFF',
+                        cursor:
+                          item.availableStock !== undefined && item.qty >= item.availableStock
+                            ? 'not-allowed'
+                            : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--text-secondary)',
+                        color:
+                          item.availableStock !== undefined && item.qty >= item.availableStock
+                            ? '#A0A6A2'
+                            : 'var(--text-secondary)',
                       }}
                     >
                       <Plus size={14} />

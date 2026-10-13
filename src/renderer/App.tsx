@@ -10,12 +10,14 @@ import { ReturnsScreen } from './features/returns';
 import { CashScreen } from './features/cash';
 import { ReportsScreen } from './features/reports';
 import { SettingsScreen } from './features/settings';
+import { InvoicesScreen } from './features/invoices';
 import { LoginPage, LockScreen } from './features/auth';
 import { SafeUser } from '../shared/types/users.types';
 import { Loader2 } from 'lucide-react';
 
 export type NavTab =
   | 'pos'
+  | 'invoices'
   | 'products'
   | 'inventory'
   | 'purchases'
@@ -153,6 +155,7 @@ export function AppContent(): React.ReactElement {
           onLogout={handleLogout}
         >
           {activeTab === 'pos' && <PosScreen />}
+          {activeTab === 'invoices' && <InvoicesScreen />}
           {activeTab === 'products' && <ProductsScreen />}
           {activeTab === 'inventory' && <InventoryScreen />}
           {activeTab === 'purchases' && <PurchasesScreen />}

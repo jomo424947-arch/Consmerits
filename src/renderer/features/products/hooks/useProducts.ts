@@ -24,20 +24,15 @@ export function useProducts() {
             variantsCount: p.variants?.length || 1,
             totalStock: p.variants?.reduce((sum: number, v: any) => sum + (v.total_stock || 0), 0) || 0,
             unit: p.unit || 'قطعة',
+            primaryBarcode: p.variants?.[0]?.barcodes?.[0] || '---',
+            price: p.variants?.[0]?.sale_price || 0,
           }));
           setProducts(mapped);
           return;
         }
       }
 
-      // بيانات افتراضية توضيحية أولية إن كانت قاعدة البيانات جديدة تماماً
-      setProducts([
-        { id: 1, name: 'أحمر شفاه مخملي ميني', category: 'مكياج', brand: 'ميبيلين', variantsCount: 4, totalStock: 35, unit: 'قطعة' },
-        { id: 2, name: 'سيروم حمض الهيالورونيك 30مل', category: 'عناية بالبشرة', brand: 'ذا أورديناري', variantsCount: 1, totalStock: 18, unit: 'عبوة' },
-        { id: 3, name: 'ماسكارا لاش برنسيس المقاومة للماء', category: 'عيون', brand: 'إيسنس', variantsCount: 2, totalStock: 42, unit: 'قطعة' },
-        { id: 4, name: 'كريم مرطب غني للبشرة الجافة', category: 'عناية بالبشرة', brand: 'سيتافيل', variantsCount: 2, totalStock: 12, unit: 'علبة' },
-        { id: 5, name: 'عطر زهري شرقي 50مل', category: 'عطور', brand: 'زارا', variantsCount: 1, totalStock: 8, unit: 'زجاجة' },
-      ]);
+      setProducts([]);
     } catch (err: any) {
       setError(err.message || 'تعذر تحميل المنتجات');
     } finally {

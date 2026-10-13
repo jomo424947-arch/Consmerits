@@ -6,4 +6,6 @@ export interface ProductItemRow {
   variantsCount: number;
   totalStock: number;
   unit: string;
+  primaryBarcode?: string;
+  price?: number;
 }

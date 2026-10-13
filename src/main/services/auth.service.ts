@@ -573,8 +573,24 @@ export class AuthService {
    */
   seedDefaultOwnerIfNone(): SafeUser | null {
     const db = this.getDb();
-    // إزالة الحساب الافتراضي التجريبي القديم إن وُجد لتعزيز الأمان
-    db.prepare("DELETE FROM users WHERE username = 'admin' AND display_name = 'مدير النظام الرئيسي'").run();
+    // إزالة أو تعطيل الحساب الافتراضي التجريبي القديم إن وُجد لتعزيز الأمان
+    try {
+      db.prepare("DELETE FROM users WHERE username = 'admin' AND display_name = 'مدير النظام الرئيسي'").run();
+    } catch {
+      // في حال كان للحساب القديم سجلات تدقيق أو عمليات مرتبطة، يتم تعطيله بالكامل وسحب الصلاحيات
+      try {
+        db.prepare(`
+          UPDATE users 
+          SET is_active = 0, 
+              password_hash = 'DISABLED_ACCOUNT', 
+              pin_hash = NULL, 
+              role = 'cashier' 
+          WHERE username = 'admin'
+        `).run();
+      } catch {
+        // تجاهل أي خطأ ثانوي
+      }
+    }
 
     let primaryOwner: SafeUser | null = null;
     let seededAny = false;

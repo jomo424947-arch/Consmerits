@@ -6,6 +6,8 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/constants/ipc-channels';
 import { createSaleSchema } from '../../../shared/schemas/sales.schema';
 import { salesService } from '../../services/sales.service';
+import { sessionService } from '../../services/session.service';
+import { cashService } from '../../services/cash.service';
 import { receiptPrinter } from '../../printing/receipt-printer';
 
 export function registerSalesIpcHandlers(): void {
@@ -24,7 +26,24 @@ export function registerSalesIpcHandlers(): void {
         };
       }
 
-      const sale = await salesService.createSale(parsed.data, userId, shiftId);
+      const resolvedUserId = userId || sessionService.getCurrentUser()?.id || 1;
+      let resolvedShiftId = shiftId;
+      if (!resolvedShiftId) {
+        const activeShift = await cashService.getActiveShift(resolvedUserId);
+        if (activeShift) {
+          resolvedShiftId = activeShift.id;
+        } else {
+          // فتح وردية جديدة تلقائية عند أول عملية بيع إذا لم تكن مفتوحة مسبقاً
+          const newShift = await cashService.openShift(
+            resolvedUserId,
+            0,
+            'وردية مفتوحة تلقائياً لبدء عمليات البيع'
+          );
+          resolvedShiftId = newShift.id;
+        }
+      }
+
+      const sale = await salesService.createSale(parsed.data, resolvedUserId, resolvedShiftId);
 
       // طباعة الإيصال إن أمكن
       try {

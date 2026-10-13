@@ -153,12 +153,8 @@ export function PaymentModal({
       };
 
       if (!electron?.createSale) {
-        // Fallback في بيئة المعاينة
-        sounds.playSaleSuccess();
-        sounds.playCashRegister();
-        toastSuccess('تم تسجيل عملية البيع بنجاح (وضع المعاينة)');
-        onSaleComplete();
-        onClose();
+        sounds.playError();
+        setError('تعذر الاتصال بالخدمة الرئيسية لتسجيل الفاتورة');
         return;
       }
 

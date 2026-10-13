@@ -34,10 +34,17 @@ export function usePos() {
         // التحقق أولاً إذا كان المنتج موجوداً مسبقاً في السلة لزيادة الكمية فوراً
         const existingIndex = cart.findIndex((i) => i.barcode === cleanBarcode);
         if (existingIndex >= 0) {
+          const item = cart[existingIndex];
+          if (item.availableStock !== undefined && item.qty + 1 > item.availableStock) {
+            sounds.playError();
+            return {
+              success: false,
+              message: `الكمية المطلوبة تتجاوز الرصيد المتوفر بالمخزون (${item.availableStock} قطعة)`,
+            };
+          }
           sounds.playBarcodeBeep();
           setCart((prev) => {
             const next = [...prev];
-            const item = next[existingIndex];
             const newQty = item.qty + 1;
             next[existingIndex] = {
               ...item,
@@ -51,22 +58,8 @@ export function usePos() {
         }
 
         if (!electron?.getProductByBarcode) {
-          // محاكاة وضع المعاينة إن لم تتوفر قاعدة البيانات
-          const mockItem: CartLineItem = {
-            id: `item-${Date.now()}`,
-            variantId: 101,
-            productName: `مستحضر تجميل (${cleanBarcode})`,
-            variantName: 'العبوة القياسية',
-            barcode: cleanBarcode,
-            unitPrice: 12500, // 125.00
-            qty: 1,
-            discount: 0,
-            total: 12500,
-          };
-          sounds.playBarcodeBeep();
-          setCart((prev) => [mockItem, ...prev]);
-          setLastScannedItem(mockItem);
-          return { success: true };
+          sounds.playError();
+          return { success: false, message: 'تعذر الاتصال بقاعدة البيانات للتحقق من الباركود' };
         }
 
         const res = await electron.getProductByBarcode(cleanBarcode);
@@ -78,10 +71,15 @@ export function usePos() {
         const data = res.data;
         const variant = data.variant;
         const product = data.product;
+        const availableStock = Number(data.available_stock) || 0;
 
-        // التحقق من توفر رصيد
-        if (data.available_stock <= 0) {
-          sounds.playWarning();
+        // التحقق الصارم من توفر رصيد لمنع البيع بالسالب
+        if (availableStock <= 0) {
+          sounds.playError();
+          return {
+            success: false,
+            message: `عذراً، الصنف "${product.name_ar}" نفد من المخزون تماماً (الرصيد المتوفر: 0)`,
+          };
         }
 
         const newItem: CartLineItem = {
@@ -92,6 +90,7 @@ export function usePos() {
           barcode: cleanBarcode,
           unitPrice: variant.sale_price,
           qty: 1,
+          availableStock,
           discount: 0,
           total: variant.sale_price,
         };
@@ -111,7 +110,15 @@ export function usePos() {
   );
 
   /**
-   * تحديث كمية عنصر في السلة
+   * حذف عنصر من السلة
+   */
+  const removeItem = useCallback((id: string) => {
+    sounds.playDelete();
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  /**
+   * تحديث كمية عنصر في السلة مع منع تجاوز المخزون
    */
   const updateQuantity = useCallback((id: string, newQty: number) => {
     sounds.playClick();
@@ -123,6 +130,10 @@ export function usePos() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === id) {
+          if (item.availableStock !== undefined && newQty > item.availableStock) {
+            sounds.playError();
+            return item;
+          }
           return {
             ...item,
             qty: newQty,
@@ -132,7 +143,7 @@ export function usePos() {
         return item;
       })
     );
-  }, []);
+  }, [removeItem]);
 
   /**
    * تطبيق خصم على صنف محدد
@@ -152,14 +163,6 @@ export function usePos() {
         return item;
       })
     );
-  }, []);
-
-  /**
-   * حذف عنصر من السلة
-   */
-  const removeItem = useCallback((id: string) => {
-    sounds.playDelete();
-    setCart((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   /**

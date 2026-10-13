@@ -16,6 +16,7 @@ interface MainLayoutProps {
 
 const tabTitles: Record<NavTab, string> = {
   pos: 'شاشة البيع ونقطة الكاشير',
+  invoices: 'سجل فواتير المبيعات والعمليات',
   products: 'إدارة المنتجات والأصناف والباركود',
   inventory: 'إدارة المخزون وتواريخ الصلاحية (FEFO)',
   purchases: 'المشتريات وفواتير الموردين',
@@ -27,13 +28,14 @@ const tabTitles: Record<NavTab, string> = {
 
 const hotkeyMap: Record<string, NavTab> = {
   F1: 'pos',
-  F2: 'products',
-  F3: 'inventory',
-  F4: 'purchases',
-  F5: 'returns',
-  F6: 'cash',
-  F7: 'reports',
-  F8: 'settings',
+  F2: 'invoices',
+  F3: 'products',
+  F4: 'inventory',
+  F5: 'purchases',
+  F6: 'returns',
+  F7: 'cash',
+  F8: 'reports',
+  F9: 'settings',
 };
 
 export function MainLayout({

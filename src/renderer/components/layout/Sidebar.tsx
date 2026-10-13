@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart,
+  Receipt,
   Tag,
   Package,
   Truck,
@@ -38,13 +39,14 @@ interface NavItemDef {
 
 const navItems: NavItemDef[] = [
   { id: 'pos', label: 'شاشة البيع (POS)', icon: ShoppingCart, variant: 'brand', hotkey: 'F1' },
-  { id: 'products', label: 'المنتجات والباركود', icon: Tag, variant: 'primary', hotkey: 'F2' },
-  { id: 'inventory', label: 'المخزون والصلاحية', icon: Package, variant: 'gold', hotkey: 'F3' },
-  { id: 'purchases', label: 'المشتريات والموردين', icon: Truck, variant: 'info', hotkey: 'F4' },
-  { id: 'returns', label: 'المرتجعات والبدائل', icon: RotateCcw, variant: 'danger', hotkey: 'F5' },
-  { id: 'cash', label: 'الخزنة والورديات', icon: Coins, variant: 'gold', hotkey: 'F6' },
-  { id: 'reports', label: 'التقارير والإحصائيات', icon: BarChart3, variant: 'brand', hotkey: 'F7' },
-  { id: 'settings', label: 'الإعدادات والمستخدمين', icon: Settings, variant: 'neutral', hotkey: 'F8' },
+  { id: 'invoices', label: 'سجل الفواتير', icon: Receipt, variant: 'info', hotkey: 'F2' },
+  { id: 'products', label: 'المنتجات والباركود', icon: Tag, variant: 'primary', hotkey: 'F3' },
+  { id: 'inventory', label: 'المخزون والصلاحية', icon: Package, variant: 'gold', hotkey: 'F4' },
+  { id: 'purchases', label: 'المشتريات والموردين', icon: Truck, variant: 'info', hotkey: 'F5' },
+  { id: 'returns', label: 'المرتجعات والبدائل', icon: RotateCcw, variant: 'danger', hotkey: 'F6' },
+  { id: 'cash', label: 'الخزنة والورديات', icon: Coins, variant: 'gold', hotkey: 'F7' },
+  { id: 'reports', label: 'التقارير والإحصائيات', icon: BarChart3, variant: 'brand', hotkey: 'F8' },
+  { id: 'settings', label: 'الإعدادات والمستخدمين', icon: Settings, variant: 'neutral', hotkey: 'F9' },
 ];
 
 export function Sidebar({

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store,
   Users,
@@ -52,16 +52,71 @@ export function SettingsScreen(): React.ReactElement {
   const [lockoutDuration, setLockoutDuration] = useState('15');
   const [retentionDays, setRetentionDays] = useState('30');
 
-  const handleSaveStore = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const electron = (window as any).electron;
+        if (electron?.getSettings) {
+          const res = await electron.getSettings();
+          if (res?.success && res.data) {
+            const map = res.data;
+            if (map.store_name) setStoreName(map.store_name);
+            if (map.store_address) setStoreAddress(map.store_address);
+            if (map.store_phone) setStorePhone(map.store_phone);
+            if (map.tax_number) setTaxNumber(map.tax_number);
+            if (map.receipt_footer) setReceiptFooter(map.receipt_footer);
+            if (map.auto_lock_minutes) setAutoLockMinutes(map.auto_lock_minutes);
+            if (map.max_failed_attempts) setMaxFailedAttempts(map.max_failed_attempts);
+            if (map.lockout_duration_minutes) setLockoutDuration(map.lockout_duration_minutes);
+            if (map.audit_retention_days) setRetentionDays(map.audit_retention_days);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
-    sounds.playSaleSuccess();
-    toastSuccess('تم حفظ بيانات المتجر والترويسة بنجاح');
+    try {
+      const electron = (window as any).electron;
+      if (electron?.updateSettings) {
+        await electron.updateSettings([
+          { key: 'store_name', value: storeName },
+          { key: 'store_address', value: storeAddress },
+          { key: 'store_phone', value: storePhone },
+          { key: 'tax_number', value: taxNumber },
+          { key: 'receipt_footer', value: receiptFooter },
+        ], 1);
+      }
+      sounds.playSaleSuccess();
+      toastSuccess('تم حفظ بيانات المتجر والترويسة بنجاح');
+    } catch {
+      sounds.playError();
+      toastSuccess('فشل حفظ الإعدادات');
+    }
   };
 
-  const handleSaveSecurity = (e: React.FormEvent) => {
+  const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
-    sounds.playSaleSuccess();
-    toastSuccess('تم تحديث سياسات الأمان والقفل التلقائي بنجاح');
+    try {
+      const electron = (window as any).electron;
+      if (electron?.updateSettings) {
+        await electron.updateSettings([
+          { key: 'auto_lock_minutes', value: autoLockMinutes },
+          { key: 'max_failed_attempts', value: maxFailedAttempts },
+          { key: 'lockout_duration_minutes', value: lockoutDuration },
+          { key: 'audit_retention_days', value: retentionDays },
+        ], 1);
+      }
+      sounds.playSaleSuccess();
+      toastSuccess('تم تحديث سياسات الأمان والقفل التلقائي بنجاح');
+    } catch {
+      sounds.playError();
+      toastSuccess('فشل حفظ سياسات الأمان');
+    }
   };
 
   return (

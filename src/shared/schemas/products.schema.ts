@@ -12,6 +12,7 @@ export const createProductVariantSchema = z.object({
   min_stock_level: z.number().int().nonnegative().optional().default(0),
   min_stock: z.number().int().nonnegative().optional(),
   max_stock_level: z.number().int().nonnegative().optional().nullable(),
+  initial_stock: z.number().int().nonnegative().optional().default(0),
   barcodes: z.array(z.string().min(1)).default([]),
 });
 

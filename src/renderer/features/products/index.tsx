@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
-import { Tag, Plus, Search, Sparkles, Package, AlertTriangle, Layers, Barcode } from 'lucide-react';
+import { Tag, Plus, Search, Sparkles, Package, AlertTriangle, Layers, Barcode, Printer } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { GlassIcon } from '../../components/common/GlassIcon';
 import { Badge } from '../../components/common/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ProductFormModal } from './components/ProductFormModal';
+import { BarcodePrintModal } from './components/BarcodePrintModal';
 import { useProducts } from './hooks/useProducts';
+import { formatMoney } from '../../../shared/utils/money';
 import { sounds } from '../../lib/sounds';
 
 export function ProductsScreen(): React.ReactElement {
   const { products, searchQuery, setSearchQuery, isLoading, refresh } = useProducts();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [printingProduct, setPrintingProduct] = useState<{
+    name: string;
+    barcode: string;
+    priceFormatted: string;
+  } | null>(null);
 
   const totalStockCount = products.reduce((sum, p) => sum + p.totalStock, 0);
   const lowStockCount = products.filter((p) => p.totalStock <= 5).length;
@@ -159,12 +166,13 @@ export function ProductsScreen(): React.ReactElement {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
               <thead>
                 <tr style={{ background: '#FAFBF9', borderBottom: '1.5px solid var(--border-light)' }}>
-                  <th style={{ width: '6%', padding: '12px 16px', textAlign: 'center' }}>#</th>
-                  <th style={{ width: '32%', padding: '12px 16px' }}>اسم المنتج / الصنف</th>
-                  <th style={{ width: '16%', padding: '12px 16px' }}>القسم</th>
-                  <th style={{ width: '16%', padding: '12px 16px' }}>الماركة</th>
-                  <th style={{ width: '14%', padding: '12px 16px', textAlign: 'center' }}>الدرجات/الأنواع</th>
-                  <th style={{ width: '16%', padding: '12px 16px', textAlign: 'center' }}>المخزون المتوفر</th>
+                  <th style={{ width: '5%', padding: '12px 14px', textAlign: 'center' }}>#</th>
+                  <th style={{ width: '28%', padding: '12px 14px' }}>اسم المنتج / الصنف</th>
+                  <th style={{ width: '14%', padding: '12px 14px' }}>القسم</th>
+                  <th style={{ width: '14%', padding: '12px 14px' }}>الماركة</th>
+                  <th style={{ width: '12%', padding: '12px 14px', textAlign: 'center' }}>الباركود</th>
+                  <th style={{ width: '14%', padding: '12px 14px', textAlign: 'center' }}>المخزون المتوفر</th>
+                  <th style={{ width: '13%', padding: '12px 14px', textAlign: 'center' }}>طباعة ملصق</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,11 +188,11 @@ export function ProductsScreen(): React.ReactElement {
                         transition: 'background 0.15s ease',
                       }}
                     >
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
                         {idx + 1}
                       </td>
 
-                      <td style={{ padding: '12px 16px' }}>
+                      <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 600, color: 'var(--color-brand-deep)', fontSize: 14 }}>
                           {p.name}
                         </div>
@@ -193,7 +201,7 @@ export function ProductsScreen(): React.ReactElement {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>
                         <span
                           style={{
                             backgroundColor: '#EAEFEA',
@@ -206,21 +214,53 @@ export function ProductsScreen(): React.ReactElement {
                         </span>
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>
                         {p.brand}
                       </td>
 
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13 }}>
-                        {p.variantsCount}
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            backgroundColor: '#F0F3F1',
+                            padding: '3px 7px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {p.primaryBarcode || '---'}
+                        </span>
                       </td>
 
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                         {isOut ? (
                           <span className="badge badge-danger">نفد المخزون</span>
                         ) : isLow ? (
                           <span className="badge badge-warn">{p.totalStock} {p.unit} (منخفض)</span>
                         ) : (
                           <span className="badge badge-success">{p.totalStock} {p.unit}</span>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        {p.primaryBarcode && p.primaryBarcode !== '---' && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              sounds.playClick();
+                              setPrintingProduct({
+                                name: p.name,
+                                barcode: p.primaryBarcode!,
+                                priceFormatted: formatMoney(p.price || 0),
+                              });
+                            }}
+                            style={{ height: 32, padding: '0 10px', fontSize: 12 }}
+                            title="طباعة ملصق باركود حراري"
+                          >
+                            <Printer size={13} />
+                            <span>طباعة</span>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -238,6 +278,17 @@ export function ProductsScreen(): React.ReactElement {
         onClose={() => setIsModalOpen(false)}
         onSuccess={refresh}
       />
+
+      {/* نافذة طباعة الباركود */}
+      {printingProduct && (
+        <BarcodePrintModal
+          isOpen={Boolean(printingProduct)}
+          onClose={() => setPrintingProduct(null)}
+          productName={printingProduct.name}
+          priceFormatted={printingProduct.priceFormatted}
+          barcode={printingProduct.barcode}
+        />
+      )}
     </div>
   );
 }

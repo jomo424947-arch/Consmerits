@@ -144,6 +144,17 @@ export class ProductsService {
 
     const createTx = db.transaction(() => {
       const productUuid = crypto.randomUUID();
+
+      let categoryId = input.category_id ?? null;
+      if (!categoryId && (input as any).category_name) {
+        categoryId = this.getOrCreateCategory((input as any).category_name);
+      }
+
+      let brandId = input.brand_id ?? null;
+      if (!brandId && (input as any).brand_name) {
+        brandId = this.getOrCreateBrand((input as any).brand_name);
+      }
+
       const insertProduct = db.prepare(`
         INSERT INTO products (
           uuid, category_id, brand_id, name_ar, name_en, unit, image_path, is_active, created_at, updated_at
@@ -152,8 +163,8 @@ export class ProductsService {
 
       const pResult = insertProduct.run(
         productUuid,
-        input.category_id ?? null,
-        input.brand_id ?? null,
+        categoryId,
+        brandId,
         input.name_ar.trim(),
         input.name_en?.trim() ?? null,
         input.unit ?? 'قطعة',
@@ -207,6 +218,23 @@ export class ProductsService {
             const isInternal = bCode.startsWith('20') ? 1 : 0;
             insertBarcode.run(variantId, bCode.trim(), isInternal);
           });
+        }
+
+        // إنشاء الدفعة الافتتاحية للمخزون إذا تم إدخال رصيد أولي أكبر من الصفر
+        const initialStock = Number((vInput as any).initial_stock) || 0;
+        if (initialStock > 0) {
+          const batchNo = `INIT-${Date.now().toString().slice(-6)}`;
+          const batchRes = db.prepare(`
+            INSERT INTO batches (variant_id, batch_no, expiry_date, unit_cost, qty_remaining, received_at)
+            VALUES (?, ?, NULL, ?, 0, datetime('now'))
+          `).run(variantId, batchNo, (vInput as any).cost_price ?? 0);
+          const batchId = Number(batchRes.lastInsertRowid);
+
+          // إدراج حركة المخزون (سيقوم مشغل trg_movement_apply بزيادة qty_remaining في الدفعة)
+          db.prepare(`
+            INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
+            VALUES (?, 'adjust_in', ?, 'initial_stock', ?, ?, 'رصيد مخزون افتتاحي عند إضافة المنتج', datetime('now'))
+          `).run(batchId, initialStock, productId, actorUserId ?? 1);
         }
       }
 
