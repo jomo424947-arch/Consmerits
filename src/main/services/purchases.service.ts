@@ -235,8 +235,8 @@ export class PurchasesService {
         SELECT 
           p.*, s.name as supplier_name, u.display_name as user_name
         FROM purchases p
-        JOIN suppliers s ON p.supplier_id = s.id
-        JOIN users u ON p.user_id = u.id
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        LEFT JOIN users u ON p.user_id = u.id
         WHERE p.id = ?
       `)
       .get(id) as Purchase | undefined;
@@ -319,8 +319,8 @@ export class PurchasesService {
       SELECT 
         p.*, s.name as supplier_name, u.display_name as user_name
       FROM purchases p
-      JOIN suppliers s ON p.supplier_id = s.id
-      JOIN users u ON p.user_id = u.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN users u ON p.user_id = u.id
       ${whereClause}
       ORDER BY p.id DESC
       LIMIT ? OFFSET ?

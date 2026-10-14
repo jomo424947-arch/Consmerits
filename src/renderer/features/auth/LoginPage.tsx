@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, KeyRound, User, Lock, AlertCircle, Delete } from 'lucide-react';
+import {
+  Sparkles,
+  KeyRound,
+  User,
+  Lock,
+  AlertCircle,
+  Delete,
+  Users,
+  Crown,
+  ShieldCheck,
+  Check,
+} from 'lucide-react';
 import { SafeUser } from '../../../shared/types/users.types';
+import { UserRole, ROLE_LABELS } from '../../../shared/constants/roles';
 import { sounds } from '../../lib/sounds';
 import logoImg from '../../assets/logo.png';
+
+export interface LoginUserSummary {
+  id: number;
+  username: string;
+  display_name: string;
+  role: UserRole;
+  has_pin: boolean;
+}
 
 interface LoginPageProps {
   onLoginSuccess: (user: SafeUser) => void;
@@ -16,6 +36,56 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+
+  // قائمة الحسابات المسجلة على هذا الجهاز
+  const [availableUsers, setAvailableUsers] = useState<LoginUserSummary[]>([]);
+  const [selectedUser, setSelectedUser] = useState<LoginUserSummary | null>(null);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+  // جلب المستخدمين المسجلين على هذا الجهاز عند بدء التشغيل
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUsers = async () => {
+      try {
+        const electron = (window as any).electron;
+        if (electron?.getLoginUsers) {
+          const users: LoginUserSummary[] = await electron.getLoginUsers();
+          if (isMounted && Array.isArray(users)) {
+            setAvailableUsers(users);
+            if (users.length > 0) {
+              // تحديد أول مستخدم يمتلك PIN تلقائياً أو أول مستخدم
+              const defaultUser = users.find((u) => u.has_pin) || users[0];
+              setSelectedUser(defaultUser);
+              if (defaultUser) {
+                setUsername(defaultUser.username);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load login users', err);
+      } finally {
+        if (isMounted) setIsLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // اختيار مستخدم
+  const handleSelectUser = (user: LoginUserSummary) => {
+    sounds.playClick();
+    setSelectedUser(user);
+    setPin('');
+    setError(null);
+    setUsername(user.username);
+    if (mode === 'pin' && !user.has_pin) {
+      triggerError('هذا الحساب لم يتم تعيين رمز PIN له، يرجى الدخول بكلمة المرور');
+    }
+  };
 
   // دعم لوحة المفاتيح المباشرة للـ PIN (أرقام 0-9، Enter، Backspace، Escape)
   useEffect(() => {
@@ -50,7 +120,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, pin]);
+  }, [mode, pin, selectedUser]);
 
   const triggerError = (msg: string) => {
     sounds.playError();
@@ -91,6 +161,11 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
       return;
     }
 
+    if (selectedUser && !selectedUser.has_pin) {
+      triggerError('هذا الحساب لم يتم تعيين رمز PIN له، يرجى تسجيل الدخول بكلمة المرور');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -100,18 +175,18 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
         // Fallback في بيئة المعاينة
         sounds.playSaleSuccess();
         onLoginSuccess({
-          id: 1,
+          id: selectedUser?.id || 1,
           uuid: 'dev',
-          username: 'admin',
-          display_name: 'مدير المحل (افتراضي)',
-          role: 'owner',
+          username: selectedUser?.username || 'admin',
+          display_name: selectedUser?.display_name || 'مدير المحل (افتراضي)',
+          role: selectedUser?.role || 'owner',
           is_active: 1,
           created_at: new Date().toISOString(),
         });
         return;
       }
 
-      const res = await electron.loginWithPin(pin);
+      const res = await electron.loginWithPin(effectivePin, selectedUser?.id);
       if (res?.success && res.user) {
         sounds.playSaleSuccess();
         onLoginSuccess(res.user);
@@ -226,7 +301,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: 450,
+          maxWidth: 460,
+          maxHeight: '96vh',
+          overflowY: 'auto',
           backgroundColor: '#FFFFFF',
           borderRadius: 28,
           border: '1.5px solid rgba(255, 149, 165, 0.25)',
@@ -235,10 +312,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
             0 12px 28px -6px rgba(0, 0, 0, 0.04),
             0 0 0 1px #F3F4F6
           `,
-          padding: '36px 32px 30px',
+          padding: '26px 26px 20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 20,
+          gap: 14,
           zIndex: 10,
         }}
       >
@@ -246,13 +323,13 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
         <div style={{ textAlign: 'center' }}>
           <div
             style={{
-              width: 90,
-              height: 90,
+              width: 76,
+              height: 76,
               borderRadius: '50%',
               padding: 3,
               background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
               boxShadow: '0 12px 30px -4px rgba(255, 112, 136, 0.4), 0 4px 10px rgba(0, 0, 0, 0.04)',
-              margin: '0 auto 14px',
+              margin: '0 auto 10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -275,7 +352,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
           <h1
             style={{
               margin: 0,
-              fontSize: 23,
+              fontSize: 22,
               fontWeight: 800,
               color: '#111827',
               letterSpacing: '-0.3px',
@@ -286,8 +363,8 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
           </h1>
           <p
             style={{
-              margin: '6px 0 0',
-              fontSize: 13,
+              margin: '4px 0 0',
+              fontSize: 12.5,
               color: '#FF6584',
               fontWeight: 700,
             }}
@@ -320,10 +397,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              padding: '10px 0',
+              padding: '9px 0',
               border: mode === 'pin' ? '1px solid rgba(255, 149, 165, 0.25)' : '1px solid transparent',
               borderRadius: 10,
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
               backgroundColor: mode === 'pin' ? '#FFFFFF' : 'transparent',
@@ -349,10 +426,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              padding: '10px 0',
+              padding: '9px 0',
               border: mode === 'password' ? '1px solid rgba(255, 149, 165, 0.25)' : '1px solid transparent',
               borderRadius: 10,
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
               backgroundColor: mode === 'password' ? '#FFFFFF' : 'transparent',
@@ -365,6 +442,217 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
             <span>اسم المستخدم (إدارة)</span>
           </button>
         </div>
+
+        {/* قائمة الحسابات المسجلة على هذا الجهاز (Device Registered Accounts Switcher) */}
+        {availableUsers.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              marginTop: 2,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 2px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#374151',
+                }}
+              >
+                <Users size={15} color="#FF7088" />
+                <span>اختر الحساب المسجل:</span>
+              </div>
+              {selectedUser && (
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: '#6B7280',
+                    fontWeight: 600,
+                  }}
+                >
+                  المحدد: <strong style={{ color: '#FF6584' }}>{selectedUser.display_name}</strong>
+                </span>
+              )}
+            </div>
+
+            {/* شريط بطاقات الحسابات التفاعلي */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: availableUsers.length > 3 ? 'auto' : 'hidden',
+                padding: '3px 2px 7px',
+                scrollbarWidth: 'thin',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              {availableUsers.map((user) => {
+                const isSelected = selectedUser?.id === user.id;
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => handleSelectUser(user)}
+                    style={{
+                      flex: availableUsers.length <= 3 ? 1 : '0 0 115px',
+                      minWidth: availableUsers.length <= 3 ? 0 : 115,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: '10px 6px',
+                      borderRadius: 14,
+                      border: isSelected
+                        ? '2px solid #FF7088'
+                        : '1.5px solid #F3F4F6',
+                      backgroundColor: isSelected ? '#FFF5F7' : '#FAFAFA',
+                      boxShadow: isSelected
+                        ? '0 4px 12px rgba(255, 112, 136, 0.22), 0 1px 3px rgba(0, 0, 0, 0.04)'
+                        : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                      outline: 'none',
+                      position: 'relative',
+                      transform: isSelected ? 'translateY(-2px)' : 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = '#FECDD3';
+                        e.currentTarget.style.backgroundColor = '#FFF8F9';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = '#F3F4F6';
+                        e.currentTarget.style.backgroundColor = '#FAFAFA';
+                      }
+                    }}
+                  >
+                    {/* علامة الاختيار النشط */}
+                    {isSelected && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 5,
+                          left: 5,
+                          width: 17,
+                          height: 17,
+                          borderRadius: '50%',
+                          backgroundColor: '#FF7088',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(255, 112, 136, 0.4)',
+                        }}
+                      >
+                        <Check size={10} strokeWidth={3} />
+                      </div>
+                    )}
+
+                    {/* أيقونة الأفاتار بحسب دور المستخدم */}
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: '50%',
+                        background:
+                          user.role === 'owner'
+                            ? 'linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%)'
+                            : user.role === 'manager'
+                            ? 'linear-gradient(135deg, #C7D2FE 0%, #6366F1 100%)'
+                            : 'linear-gradient(135deg, #FFCCD5 0%, #FF7088 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 5,
+                        boxShadow: isSelected
+                          ? '0 3px 8px rgba(255, 112, 136, 0.35)'
+                          : '0 2px 4px rgba(0, 0, 0, 0.04)',
+                        color: user.role === 'owner' ? '#78350F' : '#FFFFFF',
+                      }}
+                    >
+                      {user.role === 'owner' && <Crown size={18} strokeWidth={2.2} />}
+                      {user.role === 'manager' && <ShieldCheck size={18} strokeWidth={2.2} />}
+                      {user.role === 'cashier' && <User size={18} strokeWidth={2.2} />}
+                    </div>
+
+                    {/* اسم الحساب */}
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        color: isSelected ? '#111827' : '#374151',
+                        textAlign: 'center',
+                        width: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        padding: '0 4px',
+                      }}
+                      title={user.display_name}
+                    >
+                      {user.display_name}
+                    </span>
+
+                    {/* دور الحساب وحالة الـ PIN */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        marginTop: 3,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '1px 5px',
+                          borderRadius: 6,
+                          backgroundColor: isSelected ? 'rgba(255, 112, 136, 0.15)' : '#F3F4F6',
+                          color: isSelected ? '#BE123C' : '#6B7280',
+                        }}
+                      >
+                        {ROLE_LABELS[user.role] || user.role}
+                      </span>
+
+                      {!user.has_pin && (
+                        <span
+                          title="يتطلب كلمة مرور"
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            borderRadius: 4,
+                            backgroundColor: '#FEF3C7',
+                            color: '#92400E',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                          }}
+                        >
+                          <Lock size={8} />
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* شريط رسالة الخطأ (Alert Banner) */}
         {error && (
@@ -655,7 +943,11 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
                 }
               }}
             >
-              {isLoading ? 'جاري التحقق...' : 'دخول الوردية'}
+              {isLoading
+                ? 'جاري التحقق...'
+                : selectedUser
+                ? `دخول الوردية (${selectedUser.display_name})`
+                : 'دخول الوردية'}
             </button>
           </div>
         )}

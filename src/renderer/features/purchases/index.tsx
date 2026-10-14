@@ -21,9 +21,19 @@ import { sounds } from '../../lib/sounds';
 import { useToast } from '../../components/common/ToastContext';
 import { MESSAGES } from '../../lib/messages';
 import { Purchase, Supplier } from '../../../shared/types/purchases.types';
+import { useUser } from '../../lib/UserContext';
 
 export function PurchasesScreen(): React.ReactElement {
   const { success: toastSuccess, error: toastError } = useToast();
+  let currentUserId = 1;
+  try {
+    const userCtx = useUser();
+    if (userCtx?.currentUser?.id) {
+      currentUserId = userCtx.currentUser.id;
+    }
+  } catch {
+    // If rendered outside UserProvider
+  }
   const [activeTab, setActiveTab] = useState<'invoices' | 'suppliers'>('invoices');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,8 +69,13 @@ export function PurchasesScreen(): React.ReactElement {
       // 1. جلب فواتير المشتريات
       if (electron.listPurchases) {
         const pRes = await electron.listPurchases();
-        if (pRes?.success && Array.isArray(pRes.data)) {
-          setInvoices(pRes.data);
+        if (pRes?.success) {
+          const list = Array.isArray(pRes.data)
+            ? pRes.data
+            : Array.isArray(pRes.data?.purchases)
+            ? pRes.data.purchases
+            : [];
+          setInvoices(list);
         } else {
           setInvoices([]);
         }
@@ -85,7 +100,7 @@ export function PurchasesScreen(): React.ReactElement {
         if (prodRes?.success && Array.isArray(prodRes.data)) {
           setProductsList(prodRes.data);
           if (prodRes.data.length > 0 && prodRes.data[0].variants?.length > 0) {
-            setSelectedVariantId(prodRes.data[0].variants[0].id);
+            setSelectedVariantId((prev) => (prev !== '' ? prev : prodRes.data[0].variants[0].id));
           }
         }
       }
@@ -122,7 +137,7 @@ export function PurchasesScreen(): React.ReactElement {
           address: newSupplierAddress.trim() || undefined,
           initial_balance: 0,
         },
-        userId: 1,
+        userId: currentUserId,
       });
 
       if (res?.success) {
@@ -173,7 +188,7 @@ export function PurchasesScreen(): React.ReactElement {
         ],
         paid: paidPiasters,
         payment_method: paymentMethod,
-        user_id: 1,
+        user_id: currentUserId,
       });
 
       if (res?.success) {

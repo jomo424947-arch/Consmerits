@@ -22,8 +22,10 @@ const electronAPI = {
   // ==========================================
   login: (credentials: { username?: string; password?: string }) =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, credentials),
-  loginWithPin: (pin: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN_PIN, pin),
+  loginWithPin: (pin: string, userId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN_PIN, { pin, userId }),
+  getLoginUsers: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_LOGIN_USERS),
   logout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
   getCurrentUser: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_CURRENT_USER),
   verifyPin: (pin: string) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_VERIFY_PIN, pin),
@@ -120,6 +122,8 @@ const electronAPI = {
   createSale: (saleData: unknown, userId?: number, shiftId?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.SALES_CREATE, saleData, userId, shiftId),
   getSaleById: (id: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SALES_GET_BY_ID, id),
+  getSale: (id: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.SALES_GET_BY_ID, id),
   listSales: (options?: any) =>
     ipcRenderer.invoke(IPC_CHANNELS.SALES_LIST, options),

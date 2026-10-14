@@ -440,7 +440,12 @@ export function InvoicesScreen(): React.ReactElement {
                     <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '8px 12px', fontWeight: 600 }}>
                         {it.product_name}
-                        {it.variant_name && <span style={{ fontSize: 11, color: '#666', marginRight: 4 }}>({it.variant_name})</span>}
+                        {it.variant_name &&
+                          !['الافتراضي', 'افتراضي', 'default'].includes(it.variant_name.trim().toLowerCase()) && (
+                            <span style={{ fontSize: 11, color: '#666', marginRight: 4 }}>
+                              ({it.variant_name})
+                            </span>
+                          )}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
                         {it.qty}

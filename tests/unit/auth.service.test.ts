@@ -183,4 +183,35 @@ describe('AuthService (المصادقة وإدارة المستخدمين وال
     const activated = authService.toggleUserActive(created.id);
     expect(activated.is_active).toBe(1);
   });
+
+  test('قائمة مستخدمي تسجيل الدخول السريع وتحديد الحساب برمز PIN', async () => {
+    // تهيئة المالك وجلب المستخدمين لشاشة تسجيل الدخول
+    authService.seedDefaultOwnerIfNone();
+    const loginUsers = authService.getLoginUsers();
+    expect(loginUsers.length).toBeGreaterThan(0);
+    expect(loginUsers[0]).toHaveProperty('id');
+    expect(loginUsers[0]).toHaveProperty('username');
+    expect(loginUsers[0]).toHaveProperty('display_name');
+    expect(loginUsers[0]).toHaveProperty('role');
+    expect(loginUsers[0]).toHaveProperty('has_pin');
+
+    // إنشاء مستخدم بكود PIN محدد
+    const cashier = authService.createUser({
+      username: 'pin_target_user',
+      display_name: 'كاشير الورديات',
+      password: 'somepassword',
+      role: USER_ROLES.CASHIER,
+      pin: '7788',
+    });
+
+    // تسجيل الدخول مع تحديد الحساب المستهدف وPIN صحيح
+    const targetedLogin = await authService.loginWithPinDetailed('7788', cashier.id);
+    expect(targetedLogin.success).toBe(true);
+    expect(targetedLogin.user?.username).toBe('pin_target_user');
+
+    // تسجيل الدخول مع تحديد الحساب المستهدف وPIN خاطئ
+    const wrongTargetPin = await authService.loginWithPinDetailed('0000', cashier.id);
+    expect(wrongTargetPin.success).toBe(false);
+    expect(wrongTargetPin.error).toContain('رمز PIN غير صحيح');
+  });
 });

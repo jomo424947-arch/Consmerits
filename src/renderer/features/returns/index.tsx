@@ -19,9 +19,19 @@ import { sounds } from '../../lib/sounds';
 import { useToast } from '../../components/common/ToastContext';
 import { MESSAGES } from '../../lib/messages';
 import { ReturnInvoice, RefundMethod, ReturnItemCondition } from '../../../shared/types/returns.types';
+import { useUser } from '../../lib/UserContext';
 
 export function ReturnsScreen(): React.ReactElement {
   const { success: toastSuccess, error: toastError } = useToast();
+  let currentUserId = 1;
+  try {
+    const userCtx = useUser();
+    if (userCtx?.currentUser?.id) {
+      currentUserId = userCtx.currentUser.id;
+    }
+  } catch {
+    // If rendered outside UserProvider
+  }
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +43,7 @@ export function ReturnsScreen(): React.ReactElement {
   // حقول تسجيل مرتجع جديد
   const [selectedSaleId, setSelectedSaleId] = useState<number | ''>('');
   const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
   const [returnQty, setReturnQty] = useState<number>(1);
   const [condition, setCondition] = useState<ReturnItemCondition>('good');
@@ -77,18 +88,38 @@ export function ReturnsScreen(): React.ReactElement {
   // عند اختيار فاتورة مبيعات، جلب تفاصيل بنودها
   const handleSaleSelect = async (saleId: number) => {
     setSelectedSaleId(saleId);
+    if (!saleId) {
+      setSelectedSaleDetails(null);
+      setSelectedItemId('');
+      return;
+    }
+    setIsLoadingDetails(true);
     try {
       const electron = (window as any).electron;
-      const res = await electron.getSale(saleId);
+      const getSaleFn = electron?.getSaleById || electron?.getSale;
+      if (!getSaleFn) {
+        console.error('getSaleById is not available on electron');
+        return;
+      }
+      const res = await getSaleFn(saleId);
       if (res?.success && res.data) {
         setSelectedSaleDetails(res.data);
-        if (res.data.items?.length > 0) {
+        if (res.data.items && res.data.items.length > 0) {
           setSelectedItemId(res.data.items[0].id);
           setReturnQty(1);
+        } else {
+          setSelectedItemId('');
         }
+      } else {
+        setSelectedSaleDetails(null);
+        setSelectedItemId('');
       }
-    } catch {
+    } catch (err) {
+      console.error('Error fetching sale details:', err);
       setSelectedSaleDetails(null);
+      setSelectedItemId('');
+    } finally {
+      setIsLoadingDetails(false);
     }
   };
 
@@ -105,7 +136,7 @@ export function ReturnsScreen(): React.ReactElement {
       const electron = (window as any).electron;
       const res = await electron.processReturn({
         sale_id: Number(selectedSaleId),
-        user_id: 1,
+        user_id: currentUserId,
         refund_method: refundMethod,
         reason: reason.trim() || undefined,
         items: [
@@ -355,26 +386,51 @@ export function ReturnsScreen(): React.ReactElement {
             </select>
           </div>
 
-          {selectedSaleDetails && (
+          {isLoadingDetails ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', fontSize: 13, color: 'var(--text-muted)' }}>
+              <RefreshCw size={15} className="animate-spin" />
+              <span>جاري تحميل أصناف وبنود الفاتورة...</span>
+            </div>
+          ) : selectedSaleDetails ? (
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
                 اختر الصنف المراد إرجاعه من الفاتورة *
               </label>
-              <select
-                value={selectedItemId}
-                onChange={(e) => setSelectedItemId(Number(e.target.value))}
-                className="in"
-                style={{ height: 44, width: '100%' }}
-                required
-              >
-                {selectedSaleDetails.items?.map((it: any) => (
-                  <option key={it.id} value={it.id}>
-                    {it.product_name} {it.variant_name ? `(${it.variant_name})` : ''} - الكمية المباعة: {it.qty} - السعر: {formatMoney(it.unit_price)}
-                  </option>
-                ))}
-              </select>
+              {selectedSaleDetails.items && selectedSaleDetails.items.length > 0 ? (
+                <select
+                  value={selectedItemId}
+                  onChange={(e) => {
+                    const itemId = Number(e.target.value);
+                    setSelectedItemId(itemId);
+                    const it = selectedSaleDetails.items.find((x: any) => x.id === itemId);
+                    if (it) {
+                      setReturnQty((prev) => Math.min(prev, it.qty));
+                    }
+                  }}
+                  className="in"
+                  style={{ height: 44, width: '100%' }}
+                  required
+                >
+                  {selectedSaleDetails.items.map((it: any) => {
+                    const showVariant = it.variant_name && !['الافتراضي', 'افتراضي', 'default'].includes(it.variant_name.trim().toLowerCase());
+                    return (
+                      <option key={it.id} value={it.id}>
+                        {it.product_name} {showVariant ? `(${it.variant_name})` : ''} - الكمية المباعة: {it.qty} - السعر: {formatMoney(it.unit_price)}
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <div style={{ fontSize: 13, color: '#C53030', padding: '6px 0' }}>
+                  لا توجد أصناف في هذه الفاتورة
+                </div>
+              )}
             </div>
-          )}
+          ) : selectedSaleId ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+              اختر الفاتورة لعرض بنودها
+            </div>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
@@ -384,10 +440,22 @@ export function ReturnsScreen(): React.ReactElement {
               <Input
                 type="number"
                 min="1"
+                max={
+                  selectedSaleDetails?.items?.find((it: any) => it.id === selectedItemId)?.qty?.toString() || '99'
+                }
                 value={returnQty.toString()}
-                onChange={(e) => setReturnQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10) || 1;
+                  const itemMax = selectedSaleDetails?.items?.find((it: any) => it.id === selectedItemId)?.qty || 99;
+                  setReturnQty(Math.min(Math.max(1, val), itemMax));
+                }}
                 required
               />
+              {selectedSaleDetails?.items?.find((it: any) => it.id === selectedItemId) && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  أقصى كمية مسموح بها: {selectedSaleDetails.items.find((it: any) => it.id === selectedItemId).qty} قطعة
+                </div>
+              )}
             </div>
 
             <div>

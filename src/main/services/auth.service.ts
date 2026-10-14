@@ -224,10 +224,56 @@ export class AuthService {
   }
 
   /**
-   * تسجيل الدخول السريع برمز PIN مع تفاصيل كاملة
+   * تسجيل الدخول السريع برمز PIN مع تفاصيل كاملة (وإمكانية تحديد المستخدم المستهدف)
    */
-  async loginWithPinDetailed(pin: string): Promise<LoginResult> {
+  async loginWithPinDetailed(pin: string, targetUserId?: number): Promise<LoginResult> {
     const db = this.getDb();
+
+    if (targetUserId) {
+      const user = db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(targetUserId) as User | undefined;
+      if (!user) {
+        return {
+          success: false,
+          error: 'المستخدم غير موجود أو حسابه غير نشط',
+        };
+      }
+
+      if (this.isAccountLocked(user)) {
+        return {
+          success: false,
+          error: 'الحساب مجمد مؤقتاً لتكرار المحاولات الخاطئة. يرجى الانتظار أو مراجعة المدير',
+        };
+      }
+
+      if (!user.pin_hash) {
+        return {
+          success: false,
+          error: 'هذا الحساب لم يقم بتعيين رمز PIN، يرجى الدخول بكلمة المرور',
+        };
+      }
+
+      if (verifyPin(pin, user.pin_hash)) {
+        const safeUser = this.handleSuccessfulLogin(user, 'PIN');
+        return { success: true, user: safeUser };
+      } else {
+        const { attemptsRemaining, lockedUntil } = this.handleFailedAttempt(user);
+        if (lockedUntil) {
+          return {
+            success: false,
+            error: 'تم تجاوز الحد الأقصى للمحاولات وتم تجميد الحساب لمدة 15 دقيقة.',
+            lockedUntil,
+            attemptsRemaining: 0,
+          };
+        }
+        return {
+          success: false,
+          error: `رمز PIN غير صحيح لهذا الحساب. المتبقي: ${attemptsRemaining} محاولات.`,
+          attemptsRemaining,
+          lockedUntil: null,
+        };
+      }
+    }
+
     const users = db
       .prepare('SELECT * FROM users WHERE pin_hash IS NOT NULL AND is_active = 1')
       .all() as User[];
@@ -247,6 +293,38 @@ export class AuthService {
       success: false,
       error: 'رمز PIN غير صحيح أو الحساب مجمد',
     };
+  }
+
+  /**
+   * جلب قائمة المستخدمين النشطين المتاحين لشاشة تسجيل الدخول
+   */
+  getLoginUsers(): Array<{
+    id: number;
+    username: string;
+    display_name: string;
+    role: UserRole;
+    has_pin: boolean;
+  }> {
+    const db = this.getDb();
+    const rows = db
+      .prepare(
+        "SELECT id, username, display_name, role, (pin_hash IS NOT NULL AND length(pin_hash) > 0) as has_pin FROM users WHERE is_active = 1 ORDER BY id ASC"
+      )
+      .all() as Array<{
+        id: number;
+        username: string;
+        display_name: string;
+        role: UserRole;
+        has_pin: number;
+      }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      username: r.username,
+      display_name: r.display_name,
+      role: r.role,
+      has_pin: Boolean(r.has_pin),
+    }));
   }
 
   /**

@@ -30,15 +30,26 @@ export function registerAuthIpcHandlers(): void {
   });
 
   // تسجيل الدخول السريع برمز PIN
-  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_PIN, async (_event, pinInput: any) => {
+  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_PIN, async (_event, pinInput: any, maybeUserId?: number) => {
     try {
       const pin = typeof pinInput === 'string' ? pinInput : pinInput?.pin;
+      const userId = typeof pinInput === 'object' && pinInput?.userId ? pinInput.userId : maybeUserId;
       if (!pin) {
         return { success: false, error: 'رمز الـ PIN مطلوب' };
       }
 
-      const result = await authService.loginWithPinDetailed(pin.trim());
+      const result = await authService.loginWithPinDetailed(pin.trim(), userId);
       return result;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // جلب قائمة الحسابات النشطة المتاحة في شاشة الدخول
+  ipcMain.handle(IPC_CHANNELS.AUTH_GET_LOGIN_USERS, async () => {
+    try {
+      const users = authService.getLoginUsers();
+      return { success: true, data: users };
     } catch (err: any) {
       return { success: false, error: err.message };
     }

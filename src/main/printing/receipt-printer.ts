@@ -20,6 +20,90 @@ export interface ReceiptConfig {
   currency: string;
 }
 
+// أنماط باركود Code128 (المعيار الدولي لطباعة الباركود في الإيصالات)
+const CODE128_PATTERNS = [
+  '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+  '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+  '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+  '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+  '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+  '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+  '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+  '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+  '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+  '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+  '114131','311141','411131','211412','211214','211232','2331112'
+];
+
+/**
+ * توليد باركود Code128 SVG نقي بدقة عالية دون الحاجة لمكتبات خارجية
+ */
+function generateCode128Svg(text: string, height: number = 38): string {
+  const clean = text.trim() || 'INV-00000';
+  const codes = [104]; // Start Code B
+  let checksum = 104;
+  for (let i = 0; i < clean.length; i++) {
+    const code = clean.charCodeAt(i) - 32;
+    codes.push(code >= 0 && code < 103 ? code : 0);
+    checksum += (code >= 0 && code < 103 ? code : 0) * (i + 1);
+  }
+  codes.push(checksum % 103);
+  codes.push(106); // Stop Code
+
+  let bars = '';
+  let x = 8;
+  for (const c of codes) {
+    const pattern = CODE128_PATTERNS[c] || CODE128_PATTERNS[0];
+    let isBar = true;
+    for (let j = 0; j < pattern.length; j++) {
+      const w = parseInt(pattern[j], 10);
+      if (isBar) {
+        bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`;
+      }
+      x += w;
+      isBar = !isBar;
+    }
+  }
+  return `<svg viewBox="0 0 ${x + 8} ${height}" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;width:100%;max-width:190px;height:${height}px;">${bars}</svg>`;
+}
+
+/**
+ * تنسيق التاريخ والوقت بصيغة عربية واضحة ومقروءة
+ */
+function formatReceiptDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return dateStr;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'م' : 'ص';
+    hours = hours % 12 || 12;
+    const hoursStr = String(hours).padStart(2, '0');
+    return `${y}/${m}/${day} - ${hoursStr}:${minutes} ${ampm}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * فحص ما إذا كان اسم المتغير هو الاسم الافتراضي (لإخفائه من الفاتورة)
+ */
+function isDefaultVariant(name?: string | null): boolean {
+  if (!name) return true;
+  const clean = name.trim().toLowerCase();
+  return (
+    clean === 'الافتراضي' ||
+    clean === 'افتراضي' ||
+    clean === 'default' ||
+    clean === 'standard' ||
+    clean === 'عادي' ||
+    clean === ''
+  );
+}
+
 export class ReceiptPrinter {
   private db?: Database.Database;
 
@@ -57,52 +141,104 @@ export class ReceiptPrinter {
   }
 
   /**
-   * توليد قالب HTML للإيصال الحراري
+   * توليد قالب HTML للإيصال الحراري بتصميم فندقي عصري عالي الدقة والوضوح
    */
   generateReceiptHtml(sale: Sale, config?: ReceiptConfig): string {
     const cfg = config ?? this.getReceiptConfig();
     const items = sale.items ?? [];
     const payments = sale.payments ?? [];
-    const printableWidthMm = cfg.widthMm >= 80 ? 70 : 48;
+    const printableWidthMm = cfg.widthMm >= 80 ? 72 : 48;
 
+    // استخراج أسماء الكاشير والعميل إن وُجدت من قاعدة البيانات
+    let cashierName = 'كاشير المحل';
+    let customerName = '';
+    let customerPhone = '';
+    try {
+      const db = this.getDb();
+      if (sale.user_id) {
+        const userRow = db.prepare('SELECT display_name FROM users WHERE id = ?').get(sale.user_id) as
+          | { display_name: string }
+          | undefined;
+        if (userRow?.display_name) {
+          cashierName = userRow.display_name;
+        }
+      }
+      if (sale.customer_id) {
+        const custRow = db.prepare('SELECT name, phone FROM customers WHERE id = ?').get(sale.customer_id) as
+          | { name: string; phone?: string }
+          | undefined;
+        if (custRow?.name) {
+          customerName = custRow.name;
+          customerPhone = custRow.phone ?? '';
+        }
+      }
+    } catch {
+      // تجاهل الخطأ في بيئة الاختبارات عند عدم توفر الجداول
+    }
+
+    const totalQty = items.reduce((sum, it) => sum + (it.qty || 1), 0);
+    const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const changePiasters = Math.max(0, totalPaid - sale.total);
+    const barcodeSvg = generateCode128Svg(sale.invoice_no || `INV-${sale.id}`);
+    const formattedDate = formatReceiptDate(sale.created_at || new Date().toISOString());
+
+    // تجهيز بنود الفاتورة
     const itemsHtml = items
-      .map(
-        (it) => `
-        <tr style="border-bottom: 1px dashed #bbb;">
-          <td style="width: 44%; padding: 4px 2px; text-align: right; word-break: break-word;">
-            <div><strong>${it.product_name}</strong></div>
-            ${it.variant_name ? `<small style="color: #555; display: block; font-size: 9.5px;">${it.variant_name}</small>` : ''}
-          </td>
-          <td style="width: 14%; padding: 4px 2px; text-align: center; vertical-align: top;">${it.qty}</td>
-          <td style="width: 20%; padding: 4px 2px; text-align: center; vertical-align: top;">${formatPiastersToPounds(it.unit_price)}</td>
-          <td style="width: 22%; padding: 4px 2px; text-align: left; vertical-align: top;"><strong>${formatPiastersToPounds(it.line_total)}</strong></td>
-        </tr>
-      `
-      )
-      .join('');
-
-    const paymentsHtml = payments
-      .map((p) => {
-        const methodAr: Record<string, string> = {
-          cash: 'نقدي',
-          card: 'بطاقة / فيزا',
-          wallet: 'محفظة إلكترونية',
-          credit: 'آجل / حساب عميل',
-        };
+      .map((it, idx) => {
+        const showVariant = !isDefaultVariant(it.variant_name);
         return `
-          <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0;">
-            <span>${methodAr[p.method] ?? p.method}:</span>
-            <span style="font-weight: 600;">${formatPiastersToPounds(p.amount)} ${cfg.currency}</span>
-          </div>
-        `;
+        <tr class="item-row">
+          <td style="width: 44%; padding: 5px 2px; text-align: right; word-break: break-word;">
+            <div class="item-name">${it.product_name}</div>
+            ${showVariant ? `<div class="item-variant">▫ ${it.variant_name}</div>` : ''}
+          </td>
+          <td style="width: 14%; padding: 5px 2px; text-align: center; vertical-align: top; font-weight: 700;">
+            ${it.qty}
+          </td>
+          <td style="width: 20%; padding: 5px 2px; text-align: center; vertical-align: top;">
+            ${formatPiastersToPounds(it.unit_price)}
+          </td>
+          <td style="width: 22%; padding: 5px 2px; text-align: left; vertical-align: top; font-weight: 800;">
+            ${formatPiastersToPounds(it.line_total)}
+          </td>
+        </tr>
+      `;
       })
       .join('');
+
+    // تجهيز طرق الدفع
+    const methodAr: Record<string, string> = {
+      cash: 'نقدي (كاش)',
+      card: 'بطاقة مصرفية / فيزا',
+      wallet: 'محفظة إلكترونية',
+      credit: 'آجل / حساب عميل',
+      split: 'دفع متعدد',
+    };
+
+    const paymentsHtml = payments.length > 0
+      ? payments
+          .map(
+            (p) => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
+              <span>${methodAr[p.method] ?? p.method}:</span>
+              <span style="font-weight: 700;">${formatPiastersToPounds(p.amount)} ${cfg.currency}</span>
+            </div>
+          `
+          )
+          .join('')
+      : `
+        <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
+          <span>نقدي (كاش):</span>
+          <span style="font-weight: 700;">${formatPiastersToPounds(sale.total)} ${cfg.currency}</span>
+        </div>
+      `;
 
     return `
       <!DOCTYPE html>
       <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8">
+        <title>فاتورة ${sale.invoice_no}</title>
         <style>
           * {
             box-sizing: border-box;
@@ -114,56 +250,280 @@ export class ReceiptPrinter {
             size: ${cfg.widthMm}mm auto;
           }
           body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, 'Cairo', Roboto, Arial, sans-serif;
             width: ${printableWidthMm}mm;
             max-width: 100%;
             margin: 0 auto;
-            padding: 6px 4px 14px 4px;
-            font-size: 11.5px;
+            padding: 10px 4px 16px 4px;
+            font-size: 11px;
             color: #000;
             background: #fff;
             direction: rtl;
             -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-          .header { text-align: center; margin-bottom: 6px; }
-          .store-name { font-size: 16.5px; font-weight: 800; margin-bottom: 2px; }
-          .store-info { font-size: 10.5px; color: #333; margin-bottom: 2px; }
-          .sub-header { font-size: 11px; color: #444; margin-top: 2px; }
-          .divider { border-top: 1px dashed #000; margin: 6px 0; }
-          .meta { font-size: 11px; line-height: 1.5; margin-bottom: 4px; }
-          .meta-row { display: flex; justify-content: space-between; align-items: center; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; table-layout: fixed; }
-          th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 2px; font-weight: bold; }
-          td { padding: 4px 2px; }
-          .totals { font-size: 11.5px; line-height: 1.5; }
-          .totals-row { display: flex; justify-content: space-between; align-items: center; }
-          .total-highlight {
-            font-size: 14.5px;
+
+          /* الترويسة العلوية للمتجر */
+          .header {
+            text-align: center;
+            margin-bottom: 8px;
+          }
+          .store-name {
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: -0.3px;
+            margin-bottom: 3px;
+            line-height: 1.2;
+          }
+          .store-info {
+            font-size: 10.5px;
+            color: #222;
+            margin-bottom: 2px;
+            line-height: 1.4;
+          }
+          .welcome-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 10px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px dashed #444;
+            border-radius: 12px;
+            background: #fafafa;
+          }
+
+          /* فواصل حرارية أنيقة */
+          .divider-dashed {
+            border-top: 1px dashed #000;
+            margin: 7px 0;
+          }
+          .divider-double {
+            border-top: 3px double #000;
+            margin: 7px 0;
+          }
+
+          /* بطاقة بيانات الفاتورة */
+          .meta-box {
+            font-size: 10.5px;
+            line-height: 1.6;
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 6px 8px;
+            margin-bottom: 7px;
+          }
+          .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .meta-label {
+            color: #333;
+            font-weight: 600;
+          }
+          .meta-val {
+            font-weight: 700;
+            color: #000;
+          }
+          .invoice-tag {
+            font-family: monospace;
+            font-size: 12.5px;
             font-weight: 800;
+            background: #eee;
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+          }
+
+          /* جدول الأصناف */
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 4px;
+            table-layout: fixed;
+          }
+          th {
             border-top: 1.5px solid #000;
             border-bottom: 1.5px solid #000;
-            padding: 4px 0;
-            margin-top: 4px;
+            padding: 5px 2px;
+            font-weight: 800;
+            font-size: 11px;
+            background: #f2f2f2;
           }
-          .payments { font-size: 11px; line-height: 1.5; margin-top: 4px; }
-          .footer { text-align: center; font-size: 10.5px; margin-top: 10px; color: #333; line-height: 1.4; }
+          td {
+            padding: 5px 2px;
+          }
+          .item-row {
+            border-bottom: 1px dotted #ccc;
+          }
+          .item-name {
+            font-weight: 700;
+            font-size: 11.5px;
+            line-height: 1.25;
+            color: #000;
+          }
+          .item-variant {
+            font-size: 9.5px;
+            color: #444;
+            margin-top: 1px;
+            font-weight: 500;
+          }
+
+          /* ملخص الأصناف والإجماليات */
+          .counts-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10.5px;
+            color: #333;
+            background: #f6f6f6;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            font-weight: 600;
+          }
+          .totals-box {
+            font-size: 11px;
+            line-height: 1.6;
+          }
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1px 0;
+          }
+
+          /* الصافي المطلوب - المربع الأسود البارز */
+          .grand-total-banner {
+            background: #000;
+            color: #fff;
+            padding: 7px 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 7px 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .gt-title {
+            font-size: 14px;
+            font-weight: 800;
+          }
+          .gt-amount {
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: -0.2px;
+          }
+
+          /* صندوق طرق الدفع */
+          .payments-box {
+            font-size: 10.5px;
+            line-height: 1.5;
+            background: #fafafa;
+            border: 1px dashed #bbb;
+            border-radius: 5px;
+            padding: 5px 8px;
+            margin: 7px 0;
+          }
+          .payments-title {
+            font-weight: 800;
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #222;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 2px;
+          }
+
+          /* قسم الباركود */
+          .barcode-section {
+            text-align: center;
+            margin: 8px 0 6px 0;
+          }
+          .barcode-caption {
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-top: 3px;
+          }
+
+          /* التذييل والسياسة */
+          .footer {
+            text-align: center;
+            margin-top: 8px;
+            line-height: 1.4;
+          }
+          .footer-msg {
+            font-size: 11px;
+            font-weight: 700;
+            color: #111;
+            margin-bottom: 4px;
+          }
+          .policy-box {
+            font-size: 9px;
+            color: #444;
+            border: 1px dashed #999;
+            border-radius: 4px;
+            padding: 5px 6px;
+            margin: 5px 0;
+            background: #fafafa;
+            line-height: 1.4;
+          }
+          .system-brand {
+            font-size: 8.5px;
+            color: #777;
+            margin-top: 6px;
+          }
+          .ltr-text {
+            direction: ltr;
+            display: inline-block;
+            unicode-bidi: embed;
+          }
         </style>
       </head>
       <body>
+        <!-- 1. ترويسة المتجر -->
         <div class="header">
           <div class="store-name">${cfg.storeName}</div>
-          ${cfg.storeAddress ? `<div class="store-info">${cfg.storeAddress}</div>` : ''}
-          ${cfg.storePhone ? `<div class="store-info">هاتف: ${cfg.storePhone}</div>` : ''}
-          ${cfg.taxNumber ? `<div class="store-info">الرقم الضريبي: ${cfg.taxNumber}</div>` : ''}
-          <div class="sub-header">${cfg.header}</div>
+          ${cfg.storeAddress ? `<div class="store-info">📍 ${cfg.storeAddress}</div>` : ''}
+          ${cfg.storePhone ? `<div class="store-info"><span>هاتف:</span> <span class="ltr-text" style="font-weight: 700;">${cfg.storePhone}</span></div>` : ''}
+          ${cfg.taxNumber ? `<div class="store-info">الرقم الضريبي: <span class="ltr-text">${cfg.taxNumber}</span></div>` : ''}
+          <div class="welcome-badge">✦ ${cfg.header} ✦</div>
         </div>
-        <div class="divider"></div>
-        <div class="meta">
-          <div class="meta-row"><span>رقم الفاتورة:</span><strong style="font-family: monospace; font-size: 12px;">${sale.invoice_no}</strong></div>
-          <div class="meta-row"><span>التاريخ:</span><span>${sale.created_at}</span></div>
-          <div class="meta-row"><span>الوردية:</span><span>وردية رقم #${sale.shift_id}</span></div>
+
+        <div class="divider-double"></div>
+
+        <!-- 2. بيانات الفاتورة والعملية -->
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-label">رقم الفاتورة:</span>
+            <span class="meta-val invoice-tag">${sale.invoice_no}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">التاريخ والوقت:</span>
+            <span class="meta-val ltr-text">${formattedDate}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">الكاشير:</span>
+            <span class="meta-val">${cashierName}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">الوردية:</span>
+            <span class="meta-val">وردية #${sale.shift_id}</span>
+          </div>
+          ${
+            customerName
+              ? `
+          <div class="meta-row">
+            <span class="meta-label">العميل:</span>
+            <span class="meta-val">${customerName} ${customerPhone ? `(<span class="ltr-text">${customerPhone}</span>)` : ''}</span>
+          </div>`
+              : ''
+          }
         </div>
-        <div class="divider"></div>
+
+        <!-- 3. جدول الأصناف -->
         <table>
           <thead>
             <tr>
@@ -177,27 +537,73 @@ export class ReceiptPrinter {
             ${itemsHtml}
           </tbody>
         </table>
-        <div class="divider"></div>
-        <div class="totals">
-          <div class="totals-row"><span>إجمالي الأصناف:</span><span>${formatPiastersToPounds(sale.subtotal)} ${cfg.currency}</span></div>
-          ${sale.discount_amount > 0 ? `<div class="totals-row"><span>الخصم:</span><span>-${formatPiastersToPounds(sale.discount_amount)} ${cfg.currency}</span></div>` : ''}
-          ${sale.tax_amount > 0 ? `<div class="totals-row"><span>الضريبة:</span><span>+${formatPiastersToPounds(sale.tax_amount)} ${cfg.currency}</span></div>` : ''}
-          <div class="totals-row total-highlight">
-            <span>الصافي المطلوب:</span>
-            <span>${formatPiastersToPounds(sale.total)} ${cfg.currency}</span>
+
+        <!-- 4. ملخص الكميات والإجماليات -->
+        <div class="counts-bar">
+          <span>عدد الأصناف: <strong>${items.length}</strong></span>
+          <span>إجمالي القطع: <strong>${totalQty}</strong></span>
+        </div>
+
+        <div class="totals-box">
+          <div class="totals-row">
+            <span>إجمالي الأصناف:</span>
+            <span>${formatPiastersToPounds(sale.subtotal)} ${cfg.currency}</span>
+          </div>
+          ${
+            sale.discount_amount > 0
+              ? `
+          <div class="totals-row" style="color: #962b34; font-weight: 600;">
+            <span>الخصم الممنوح:</span>
+            <span>-${formatPiastersToPounds(sale.discount_amount)} ${cfg.currency}</span>
+          </div>`
+              : ''
+          }
+          ${
+            sale.tax_amount > 0
+              ? `
+          <div class="totals-row">
+            <span>ضريبة القيمة المضافة:</span>
+            <span>+${formatPiastersToPounds(sale.tax_amount)} ${cfg.currency}</span>
+          </div>`
+              : ''
+          }
+
+          <!-- الصافي المطلوب المميز -->
+          <div class="grand-total-banner">
+            <span class="gt-title">الصافي المطلوب:</span>
+            <span class="gt-amount">${formatPiastersToPounds(sale.total)} ${cfg.currency}</span>
           </div>
         </div>
-        ${paymentsHtml ? `
-        <div class="divider"></div>
-        <div class="payments">
-          <div style="font-weight: bold; font-size: 11px; margin-bottom: 2px;">طرق الدفع:</div>
+
+        <!-- 5. تفاصيل السداد والدفع -->
+        <div class="payments-box">
+          <div class="payments-title">تفاصيل وطرق السداد</div>
           ${paymentsHtml}
+          ${
+            changePiasters > 0
+              ? `
+          <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; color: #1c5233; font-weight: 700; border-top: 1px dotted #ccc; margin-top: 2px;">
+            <span>المتبقي للعميل (الباقي):</span>
+            <span>${formatPiastersToPounds(changePiasters)} ${cfg.currency}</span>
+          </div>`
+              : ''
+          }
         </div>
-        ` : ''}
-        <div class="divider"></div>
+
+        <!-- 6. الباركود الخاص بالفاتورة -->
+        <div class="barcode-section">
+          ${barcodeSvg}
+          <div class="barcode-caption">* ${sale.invoice_no} *</div>
+        </div>
+
+        <!-- 7. التذييل وسياسة الاستبدال -->
         <div class="footer">
-          <div>${cfg.footer}</div>
-          <div style="font-size: 9.5px; color: #666; margin-top: 4px;">البضاعة المباعة تستبدل خلال 14 يوماً بالفاتورة</div>
+          <div class="footer-msg">✦ ${cfg.footer} ✦</div>
+          <div class="policy-box">
+            <strong>سياسة الاستبدال والاسترجاع:</strong><br>
+            البضاعة المباعة تستبدل أو تسترجع خلال 14 يوماً مع إحضار الفاتورة بحالتها الأصلية.
+          </div>
+          <div class="system-brand">نظام بيع وجرد مستحضرات التجميل | Boutique Gouri POS</div>
         </div>
       </body>
       </html>

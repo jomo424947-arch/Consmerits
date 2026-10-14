@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
   AUTH_RESET_PIN: 'auth:reset-pin',
   AUTH_CHECK_SETUP_STATUS: 'auth:check-setup-status',
   AUTH_COMPLETE_INITIAL_SETUP: 'auth:complete-initial-setup',
+  AUTH_GET_LOGIN_USERS: 'auth:get-login-users',
 
   // Users Management
   USERS_LIST: 'users:list',
