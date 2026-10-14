@@ -7,5 +7,7 @@ export interface ProductItemRow {
   totalStock: number;
   unit: string;
   primaryBarcode?: string;
-  price?: number;
+  price?: number; // بالقروش
+  variantId?: number;
+  isActive?: number;
 }

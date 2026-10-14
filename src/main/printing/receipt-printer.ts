@@ -45,7 +45,7 @@ export class ReceiptPrinter {
     rows.forEach((r) => map.set(r.key, r.value));
 
     return {
-      storeName: map.get('store_name') ?? 'قصر الملكة',
+      storeName: map.get('store_name') ?? 'بوتيك جوري (Boutique Gouri)',
       storePhone: map.get('store_phone') ?? '',
       storeAddress: map.get('store_address') ?? '',
       taxNumber: map.get('tax_number') ?? '',

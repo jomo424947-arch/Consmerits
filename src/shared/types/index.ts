@@ -9,3 +9,4 @@ export * from './reports.types';
 export * from './settings.types';
 export * from './customers.types';
 export * from './ipc.types';
+export * from './db-inspector.types';

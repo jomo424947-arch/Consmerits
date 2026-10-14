@@ -11,9 +11,11 @@ import { CashScreen } from './features/cash';
 import { ReportsScreen } from './features/reports';
 import { SettingsScreen } from './features/settings';
 import { InvoicesScreen } from './features/invoices';
+import { DatabaseInspectorScreen } from './features/db-inspector';
 import { LoginPage, LockScreen, InitialSetupWizard } from './features/auth';
 import { SafeUser } from '../shared/types/users.types';
 import { Loader2 } from 'lucide-react';
+import logoImg from './assets/logo.png';
 
 export type NavTab =
   | 'pos'
@@ -24,7 +26,8 @@ export type NavTab =
   | 'returns'
   | 'cash'
   | 'reports'
-  | 'settings';
+  | 'settings'
+  | 'db-inspector';
 
 export function AppContent(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<NavTab>('pos');
@@ -101,7 +104,7 @@ export function AppContent(): React.ReactElement {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 16,
+          gap: 14,
           height: '100vh',
           backgroundColor: '#FFFFFF',
           color: '#1A1F26',
@@ -111,8 +114,34 @@ export function AppContent(): React.ReactElement {
           direction: 'rtl',
         }}
       >
-        <Loader2 size={36} color="#FF7088" style={{ animation: 'spin 1s linear infinite' }} />
-        <span>جاري تهيئة وتشغيل نظام كوزمتكس ستور...</span>
+        <div
+          style={{
+            width: 82,
+            height: 82,
+            borderRadius: '50%',
+            padding: 2.5,
+            background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
+            boxShadow: '0 12px 28px -4px rgba(255, 112, 136, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 4,
+          }}
+        >
+          <img
+            src={logoImg}
+            alt="Boutique Gouri Logo"
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              objectFit: 'cover',
+              backgroundColor: '#FFFFFF',
+            }}
+          />
+        </div>
+        <Loader2 size={30} color="#FF7088" style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontWeight: 700, color: '#111827' }}>جاري تهيئة وتشغيل نظام Boutique Gouri...</span>
       </div>
     );
   }
@@ -184,6 +213,7 @@ export function AppContent(): React.ReactElement {
           {activeTab === 'cash' && <CashScreen />}
           {activeTab === 'reports' && <ReportsScreen />}
           {activeTab === 'settings' && <SettingsScreen />}
+          {activeTab === 'db-inspector' && <DatabaseInspectorScreen />}
         </MainLayout>
       </div>
     </UserProvider>

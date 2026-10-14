@@ -5,6 +5,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/constants/ipc-channels';
 import { productsService } from '../../services/products.service';
+import { promotionsService } from '../../services/promotions.service';
 import { importService } from '../../services/import.service';
 import { barcodePrinter } from '../../printing/barcode-printer';
 
@@ -59,11 +60,41 @@ export function registerProductsIpcHandlers(): void {
     }
   });
 
-  // تحديث منتج
+  // تحديث منتج وأسعاره وباركوده
   ipcMain.handle(IPC_CHANNELS.PRODUCTS_UPDATE, async (_event, id, input, actorUserId) => {
     try {
       const product = await productsService.updateProduct(id, input, actorUserId);
       return { success: true, data: product };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // حذف منتج (ذكي: حذف نهائي إذا لم تكن له مبيعات، أو أرشفة آمنة إذا كانت له مبيعات سابقة)
+  ipcMain.handle(IPC_CHANNELS.PRODUCTS_DELETE, async (_event, id, actorUserId) => {
+    try {
+      const result = await productsService.deleteProduct(id, actorUserId);
+      return { success: true, data: result };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // سجل تغير أسعار المنتج
+  ipcMain.handle(IPC_CHANNELS.PRODUCTS_GET_PRICE_HISTORY, async (_event, productId) => {
+    try {
+      const history = productsService.getProductPriceHistory(productId);
+      return { success: true, data: history };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // كارت حركة الصنف
+  ipcMain.handle(IPC_CHANNELS.PRODUCTS_GET_STOCK_CARD, async (_event, productId) => {
+    try {
+      const card = productsService.getProductStockCard(productId);
+      return { success: true, data: card };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -74,6 +105,61 @@ export function registerProductsIpcHandlers(): void {
     try {
       await productsService.archiveProduct(id, actorUserId);
       return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // --- معالجات العروض الترويجية (Promotions) ---
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_LIST, async (_event, activeOnly) => {
+    try {
+      const promos = promotionsService.getPromotions(activeOnly);
+      return { success: true, data: promos };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_GET, async (_event, id) => {
+    try {
+      const promo = promotionsService.getPromotionById(id);
+      return { success: true, data: promo };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_CREATE, async (_event, input, actorUserId) => {
+    try {
+      const promo = promotionsService.createPromotion(input, actorUserId);
+      return { success: true, data: promo };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_UPDATE, async (_event, id, input, actorUserId) => {
+    try {
+      const promo = promotionsService.updatePromotion(id, input, actorUserId);
+      return { success: true, data: promo };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_DELETE, async (_event, id, actorUserId) => {
+    try {
+      const deleted = promotionsService.deletePromotion(id, actorUserId);
+      return { success: true, data: { deleted } };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PROMOTIONS_CALCULATE, async (_event, items) => {
+    try {
+      const discounts = promotionsService.calculateDiscounts(items);
+      return { success: true, data: discounts };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -126,10 +212,30 @@ export function registerProductsIpcHandlers(): void {
   });
 
   // طباعة ملصقات الباركود
-  ipcMain.handle(IPC_CHANNELS.BARCODES_PRINT_LABELS, async (_event, labels) => {
+  ipcMain.handle(IPC_CHANNELS.BARCODES_PRINT_LABELS, async (_event, labels, options) => {
     try {
-      const printed = await barcodePrinter.printLabels(labels);
-      return { success: true, data: { printed } };
+      const result = await barcodePrinter.printLabels(labels, options);
+      return result;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // جلب قائمة الطابعات المثبتة وتصنيف طابعات الباركود الحرارية
+  ipcMain.handle(IPC_CHANNELS.PRINTERS_LIST, async () => {
+    try {
+      const printers = await barcodePrinter.getSystemPrinters();
+      return { success: true, data: printers };
+    } catch (err: any) {
+      return { success: false, error: err.message, data: [] };
+    }
+  });
+
+  // تفريغ قائمة الطباعة وإلغاء المهام العالقة
+  ipcMain.handle(IPC_CHANNELS.PRINTERS_CLEAR_QUEUE, async (_event, printerName?: string) => {
+    try {
+      const res = await barcodePrinter.clearPrintQueue(printerName);
+      return res;
     } catch (err: any) {
       return { success: false, error: err.message };
     }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SafeUser } from '../../../shared/types/users.types';
 import { sounds } from '../../lib/sounds';
+import logoImg from '../../assets/logo.png';
 
 interface InitialSetupWizardProps {
   onSetupComplete: (user: SafeUser) => void;
@@ -167,23 +168,33 @@ export function InitialSetupWizard({ onSetupComplete }: InitialSetupWizardProps)
           position: 'relative',
         }}
       >
-        {/* الترويسة الرئيسية والترحيب */}
+        {/* الترويسة الرئيسية وشعار Boutique Gouri */}
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
+              width: 58,
+              height: 58,
+              borderRadius: '50%',
+              padding: 2,
               background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#FFFFFF',
-              boxShadow: '0 4px 14px rgba(255, 112, 136, 0.35)',
+              boxShadow: '0 6px 16px rgba(255, 112, 136, 0.35)',
               marginBottom: 8,
             }}
           >
-            <Sparkles size={22} />
+            <img
+              src={logoImg}
+              alt="Boutique Gouri Logo"
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
           </div>
 
           <h1
@@ -195,7 +206,7 @@ export function InitialSetupWizard({ onSetupComplete }: InitialSetupWizardProps)
               lineHeight: 1.25,
             }}
           >
-            تهيئة النظام وإعداد الحساب لأول مرة
+            مرحباً بك في Boutique Gouri • تهيئة النظام
           </h1>
           <p
             style={{
@@ -206,7 +217,7 @@ export function InitialSetupWizard({ onSetupComplete }: InitialSetupWizardProps)
               lineHeight: 1.4,
             }}
           >
-            مرحباً بك! يرجى إدخال بيانات متجرك وحساب المالك الرئيسي لبدء استخدام نظام المبيعات ونقاط البيع بأمان تام.
+            يرجى إدخال بيانات متجرك وحساب المسؤول الرئيسي لبدء استخدام نظام المبيعات ونقاط البيع بأمان تام.
           </p>
         </div>
 
@@ -260,7 +271,7 @@ export function InitialSetupWizard({ onSetupComplete }: InitialSetupWizardProps)
                     type="text"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="مثال: كوزمتكس بيوتي ستور"
+                    placeholder="مثال: بوتيك جوري - Boutique Gouri"
                     autoFocus
                     style={{
                       width: '100%',

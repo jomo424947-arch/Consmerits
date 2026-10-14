@@ -79,6 +79,12 @@ const electronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_CREATE, input, actorUserId),
   updateProduct: (id: number, input: any, actorUserId?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_UPDATE, id, input, actorUserId),
+  deleteProduct: (id: number, actorUserId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_DELETE, id, actorUserId),
+  getProductPriceHistory: (productId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_GET_PRICE_HISTORY, productId),
+  getProductStockCard: (productId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_GET_STOCK_CARD, productId),
   archiveProduct: (id: number, actorUserId?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_ARCHIVE, id, actorUserId),
   bulkUpdateProducts: (input: any, actorUserId?: number) =>
@@ -87,8 +93,26 @@ const electronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_GENERATE_BARCODE),
   importProductsExcel: (fileContentOrRows: any, actorUserId?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_IMPORT_EXCEL, fileContentOrRows, actorUserId),
-  printBarcodeLabels: (labels: any) =>
-    ipcRenderer.invoke(IPC_CHANNELS.BARCODES_PRINT_LABELS, labels),
+  printBarcodeLabels: (labels: any, options?: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BARCODES_PRINT_LABELS, labels, options),
+  getSystemPrinters: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRINTERS_LIST),
+  clearPrintQueue: (printerName?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRINTERS_CLEAR_QUEUE, printerName),
+
+  // Promotions & Discounts
+  listPromotions: (activeOnly?: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_LIST, activeOnly),
+  getPromotion: (id: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_GET, id),
+  createPromotion: (input: any, actorUserId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_CREATE, input, actorUserId),
+  updatePromotion: (id: number, input: any, actorUserId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_UPDATE, id, input, actorUserId),
+  deletePromotion: (id: number, actorUserId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_DELETE, id, actorUserId),
+  calculatePromotions: (items: any) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROMOTIONS_CALCULATE, items),
 
   // ==========================================
   // Sales & POS
@@ -331,6 +355,18 @@ const electronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_ROTATE, maxAgeDays),
   getBackupScheduleStatus: () =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_SCHEDULE_STATUS),
+
+  // ==========================================
+  // Database Inspector & Viewer
+  // ==========================================
+  selectDatabaseFile: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_INSPECTOR_SELECT_FILE),
+  inspectDatabase: (filePath?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_INSPECTOR_INSPECT, filePath),
+  getDefaultDatabasePath: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_INSPECTOR_GET_DEFAULT_PATH),
+  listInspectorBackups: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_INSPECTOR_LIST_BACKUPS),
 
   // ==========================================
   // System & Screen Lock

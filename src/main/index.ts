@@ -11,6 +11,7 @@
 
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { registerAllIpcHandlers } from './ipc';
 import { initializeDatabase, closeDatabase } from './db';
 import { authService } from './services/auth.service';
@@ -19,13 +20,34 @@ import { autoLockService } from './services/autolock.service';
 
 let mainWindow: BrowserWindow | null = null;
 
+function getAppIconPath(): string {
+  const candidates = [
+    path.join(__dirname, '../../build/icon.ico'),
+    path.join(__dirname, '../../public/icon.ico'),
+    path.join(__dirname, '../public/icon.ico'),
+    path.join(process.resourcesPath || '', 'build/icon.ico'),
+    path.join(process.resourcesPath || '', 'public/icon.ico'),
+    path.join(process.cwd(), 'build/icon.ico'),
+    path.join(process.cwd(), 'public/icon.ico'),
+    path.join(__dirname, '../../build/icon.png'),
+    path.join(process.cwd(), 'build/icon.png'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return path.join(__dirname, '../../build/icon.ico');
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 1024,
     minHeight: 700,
-    title: 'نظام بيع وجرد مستحضرات التجميل',
+    title: 'Boutique Gouri - نظام بيع وجرد مستحضرات التجميل',
+    icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

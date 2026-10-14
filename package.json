@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
+    "jsbarcode": "^3.12.3",
     "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^22.13.5",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
@@ -39,15 +41,18 @@
   },
   "build": {
     "appId": "com.cosmetics.pos",
-    "productName": "نظام بيع وجرد مستحضرات التجميل",
+    "productName": "Boutique Gouri - نظام بيع وجرد مستحضرات التجميل",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "build/**/*",
+      "public/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -62,7 +67,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "نظام بيع وجرد مستحضرات التجميل"
+      "shortcutName": "Boutique Gouri - بوتيك جوري",
+      "installerIcon": "build/installerIcon.ico",
+      "uninstallerIcon": "build/uninstallerIcon.ico",
+      "installerHeaderIcon": "build/installerIcon.ico"
     }
   }
 }

@@ -83,3 +83,33 @@ export interface ProductLookupResult {
   brand_name?: string | null;
   available_stock: number;
 }
+
+export interface ProductPriceHistory {
+  id: number;
+  variant_id: number;
+  old_price: number;
+  new_price: number;
+  user_id?: number | null;
+  user_name?: string | null;
+  reason?: string | null;
+  created_at: string;
+}
+
+export interface DeleteProductResult {
+  success: boolean;
+  action: 'deleted' | 'archived';
+  message: string;
+}
+
+export interface StockCardItem {
+  id: number;
+  type: string;
+  qty: number;
+  ref_type?: string | null;
+  ref_id?: number | null;
+  user_name?: string | null;
+  note?: string | null;
+  created_at: string;
+  batch_no?: string | null;
+  expiry_date?: string | null;
+}

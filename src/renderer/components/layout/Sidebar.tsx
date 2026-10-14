@@ -6,6 +6,7 @@ import { GlassIcon, GlassIconVariant } from '../common/GlassIcon';
 import { AppIcon } from '../common/AppIcon';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { sounds } from '../../lib/sounds';
+import logoImg from '../../assets/logo.png';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -31,6 +32,7 @@ const navItems: NavItemDef[] = [
   { id: 'cash', label: 'الخزنة والورديات', icon: 'payments', variant: 'brand' },
   { id: 'reports', label: 'التقارير والإحصائيات', icon: 'query_stats', variant: 'brand' },
   { id: 'settings', label: 'الإعدادات والمستخدمين', icon: 'settings', variant: 'brand' },
+  { id: 'db-inspector', label: 'فحص واستعراض الداتا بيز', icon: 'storage', variant: 'brand' },
 ];
 
 export function Sidebar({
@@ -113,38 +115,65 @@ export function Sidebar({
         {/* Brand Header */}
         <div
           style={{
-            padding: '20px 18px',
+            padding: '16px 16px',
             borderBottom: '1px solid var(--border-light)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAF9 100%)',
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #FFF5F7 100%)',
           }}
         >
-          <GlassIcon icon="auto_awesome" size="lg" variant="rose" glow />
-          <div>
+          <div
+            style={{
+              position: 'relative',
+              width: 46,
+              height: 46,
+              minWidth: 46,
+              borderRadius: '50%',
+              padding: 2,
+              background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
+              boxShadow: '0 4px 14px rgba(255, 112, 136, 0.32)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={logoImg}
+              alt="Boutique Gouri Logo"
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
+          </div>
+          <div style={{ overflow: 'hidden' }}>
             <h2
               style={{
-                fontSize: 16.5,
-                fontWeight: 700,
+                fontSize: 16,
+                fontWeight: 800,
                 color: 'var(--color-brand-deep)',
                 margin: 0,
                 lineHeight: 1.25,
                 fontFamily: 'var(--font-family)',
+                letterSpacing: '-0.2px',
               }}
             >
-              كوزمتكس ستور
+              Boutique Gouri
             </h2>
             <span
               style={{
                 fontSize: 11,
-                color: 'var(--text-muted)',
-                fontWeight: 500,
+                color: '#FF6584',
+                fontWeight: 600,
                 display: 'block',
                 marginTop: 2,
               }}
             >
-              نظام نقاط البيع وإدارة التجميل
+              بوتيك جوري • كوزمتكس
             </span>
           </div>
         </div>

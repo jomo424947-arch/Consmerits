@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Tag, Sparkles, Barcode, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Tag, Edit3, Barcode, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { Button } from '../../../components/common/Button';
 import { Input } from '../../../components/common/Input';
@@ -7,17 +7,20 @@ import { GlassIcon } from '../../../components/common/GlassIcon';
 import { sounds } from '../../../lib/sounds';
 import { useToast } from '../../../components/common/ToastContext';
 import { MESSAGES } from '../../../lib/messages';
+import { ProductItemRow } from '../types';
 
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  productToEdit?: ProductItemRow | null;
 }
 
 export function ProductFormModal({
   isOpen,
   onClose,
   onSuccess,
+  productToEdit,
 }: ProductFormModalProps): React.ReactElement | null {
   const { success: toastSuccess, error: toastError } = useToast();
   const [nameAr, setNameAr] = useState('');
@@ -26,13 +29,34 @@ export function ProductFormModal({
   const [priceStr, setPriceStr] = useState('');
   const [barcode, setBarcode] = useState('');
   const [initialStockStr, setInitialStockStr] = useState('10');
+  const [priceReason, setPriceReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const isEditing = !!productToEdit;
+
+  useEffect(() => {
+    if (productToEdit) {
+      setNameAr(productToEdit.name || '');
+      setCategoryName(productToEdit.category || 'مكياج');
+      setBrandName(productToEdit.brand === 'بدون علامة' ? '' : productToEdit.brand || '');
+      setPriceStr(productToEdit.price ? (productToEdit.price / 100).toString() : '0');
+      setBarcode(productToEdit.primaryBarcode === '---' ? '' : productToEdit.primaryBarcode || '');
+      setPriceReason('');
+    } else {
+      setNameAr('');
+      setCategoryName('مكياج');
+      setBrandName('');
+      setPriceStr('');
+      setBarcode('');
+      setInitialStockStr('10');
+      setPriceReason('');
+    }
+  }, [productToEdit, isOpen]);
 
   if (!isOpen) return null;
 
   const handleGenerateBarcode = () => {
     sounds.playClick();
-    // توليد باركود داخلي يبدأ بـ 200
     const randomSeq = Math.floor(100000000 + Math.random() * 900000000);
     const code = `200${randomSeq}`.slice(0, 13);
     setBarcode(code);
@@ -58,35 +82,61 @@ export function ProductFormModal({
     try {
       const electron = (window as any).electron;
       const piasters = Math.round(priceNum * 100);
-      const stock = parseInt(initialStockStr, 10) || 0;
 
-      const payload = {
-        name_ar: nameAr.trim(),
-        category_name: categoryName.trim() || 'عام',
-        brand_name: brandName.trim() || null,
-        unit: 'قطعة',
-        variants: [
-          {
-            name: 'الافتراضي',
-            sale_price: piasters,
-            min_stock: 5,
-            initial_stock: stock,
-            barcodes: barcode.trim() ? [barcode.trim()] : [],
-          },
-        ],
-      };
+      if (isEditing && productToEdit) {
+        // تحديث منتج قائم
+        const updatePayload = {
+          name_ar: nameAr.trim(),
+          category_name: categoryName.trim() || 'عام',
+          brand_name: brandName.trim() || null,
+          sale_price: piasters,
+          barcode: barcode.trim() || null,
+          variant_id: productToEdit.variantId,
+          price_change_reason: priceReason.trim() || undefined,
+        };
 
-      if (electron?.invoke) {
-        await electron.invoke('products:create', payload);
+        if (electron?.updateProduct) {
+          await electron.updateProduct(productToEdit.id, updatePayload);
+        } else if (electron?.invoke) {
+          await electron.invoke('products:update', productToEdit.id, updatePayload);
+        }
+
+        sounds.playSaleSuccess();
+        toastSuccess('تم تحديث بيانات وسعر المنتج بنجاح وتوثيق التغيير في سجل الرقابة');
+      } else {
+        // إنشاء منتج جديد
+        const stock = parseInt(initialStockStr, 10) || 0;
+        const payload = {
+          name_ar: nameAr.trim(),
+          category_name: categoryName.trim() || 'عام',
+          brand_name: brandName.trim() || null,
+          unit: 'قطعة',
+          variants: [
+            {
+              name: 'الافتراضي',
+              sale_price: piasters,
+              min_stock: 5,
+              initial_stock: stock,
+              barcodes: barcode.trim() ? [barcode.trim()] : [],
+            },
+          ],
+        };
+
+        if (electron?.createProduct) {
+          await electron.createProduct(payload);
+        } else if (electron?.invoke) {
+          await electron.invoke('products:create', payload);
+        }
+
+        sounds.playSaleSuccess();
+        toastSuccess(MESSAGES.PRODUCT_SAVED);
       }
 
-      sounds.playSaleSuccess();
-      toastSuccess(MESSAGES.PRODUCT_SAVED);
       onSuccess();
       onClose();
     } catch (err: any) {
       sounds.playError();
-      toastError(err.message || 'تعذر حفظ المنتج');
+      toastError(err.message || 'تعذر حفظ التغييرات');
     } finally {
       setIsLoading(false);
     }
@@ -96,9 +146,9 @@ export function ProductFormModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="إضافة منتج وصنف جديد"
-      icon={<GlassIcon icon={Tag} size="sm" variant="primary" />}
-      width={520}
+      title={isEditing ? `تعديل بيانات وسعر: ${productToEdit?.name}` : 'إضافة منتج وصنف جديد'}
+      icon={<GlassIcon icon={isEditing ? Edit3 : Tag} size="sm" variant="primary" />}
+      width={540}
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, direction: 'rtl' }}>
         <div>
@@ -108,7 +158,7 @@ export function ProductFormModal({
           <Input
             value={nameAr}
             onChange={(e) => setNameAr(e.target.value)}
-            placeholder="مثال: أحمر شفاه مات درجة 05"
+            placeholder="مثال: سيروم فيتامين سي لوريال"
             autoFocus
             required
           />
@@ -123,7 +173,15 @@ export function ProductFormModal({
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
               className="in"
-              style={{ height: 44 }}
+              style={{
+                width: '100%',
+                height: 42,
+                borderRadius: 8,
+                border: '1.5px solid var(--border-light)',
+                padding: '0 10px',
+                fontSize: 14,
+                backgroundColor: '#FAFCFA',
+              }}
             >
               <option value="مكياج">مكياج</option>
               <option value="عناية بالبشرة">عناية بالبشرة</option>
@@ -131,6 +189,7 @@ export function ProductFormModal({
               <option value="عطور">عطور</option>
               <option value="أظافر">أظافر</option>
               <option value="إكسسوارات">إكسسوارات</option>
+              <option value="عام">عام</option>
             </select>
           </div>
 
@@ -146,7 +205,7 @@ export function ProductFormModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isEditing ? '1fr' : '1fr 1fr', gap: 12 }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
               سعر البيع (ج.م) *
@@ -156,23 +215,39 @@ export function ProductFormModal({
               step="any"
               value={priceStr}
               onChange={(e) => setPriceStr(e.target.value)}
-              placeholder="مثال: 150.00"
+              placeholder="مثال: 180.00"
               required
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-              رصيد المخزون الأولي
-            </label>
+          {!isEditing && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
+                رصيد المخزون الافتتاحي
+              </label>
+              <Input
+                type="number"
+                value={initialStockStr}
+                onChange={(e) => setInitialStockStr(e.target.value)}
+                placeholder="10"
+              />
+            </div>
+          )}
+        </div>
+
+        {isEditing && (
+          <div style={{ backgroundColor: '#F8FAF8', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8E2' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', marginBottom: 5 }}>
+              <ShieldAlert size={14} color="var(--color-brand-deep)" />
+              <span>سبب تعديل السعر (اختياري - يوثق تلقائياً في سجل الرقابة والتاريخ):</span>
+            </div>
             <Input
-              type="number"
-              value={initialStockStr}
-              onChange={(e) => setInitialStockStr(e.target.value)}
-              placeholder="10"
+              value={priceReason}
+              onChange={(e) => setPriceReason(e.target.value)}
+              placeholder="مثال: زيادة تسعيرة المورد، خصم خاص، تعديل دوري..."
             />
           </div>
-        </div>
+        )}
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -209,7 +284,7 @@ export function ProductFormModal({
             style={{ flex: 1, height: 44, fontSize: 14 }}
           >
             <CheckCircle2 size={16} />
-            <span>حفظ المنتج والباركود</span>
+            <span>{isEditing ? 'حفظ التعديلات وتوثيق السعر' : 'حفظ المنتج والباركود'}</span>
           </Button>
 
           <Button

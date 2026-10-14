@@ -35,10 +35,23 @@ export const IPC_CHANNELS = {
   PRODUCTS_CREATE: 'products:create',
   PRODUCTS_UPDATE: 'products:update',
   PRODUCTS_ARCHIVE: 'products:archive',
+  PRODUCTS_DELETE: 'products:delete',
+  PRODUCTS_GET_PRICE_HISTORY: 'products:get-price-history',
+  PRODUCTS_GET_STOCK_CARD: 'products:get-stock-card',
   PRODUCTS_BULK_UPDATE: 'products:bulk-update',
   PRODUCTS_IMPORT_EXCEL: 'products:import-excel',
   PRODUCTS_GENERATE_BARCODE: 'products:generate-barcode',
   BARCODES_PRINT_LABELS: 'barcodes:print-labels',
+  PRINTERS_LIST: 'printers:list',
+  PRINTERS_CLEAR_QUEUE: 'printers:clear-queue',
+
+  // Promotions & Discounts
+  PROMOTIONS_LIST: 'promotions:list',
+  PROMOTIONS_GET: 'promotions:get',
+  PROMOTIONS_CREATE: 'promotions:create',
+  PROMOTIONS_UPDATE: 'promotions:update',
+  PROMOTIONS_DELETE: 'promotions:delete',
+  PROMOTIONS_CALCULATE: 'promotions:calculate',
 
   // POS & Sales
   SALES_CREATE: 'sales:create',
@@ -143,6 +156,12 @@ export const IPC_CHANNELS = {
   SYSTEM_UNLOCK: 'system:unlock',
   SYSTEM_ACTIVITY: 'system:activity',
   SYSTEM_OVERRIDE_PIN: 'system:override-pin',
+
+  // Database Inspector & Viewer
+  DB_INSPECTOR_SELECT_FILE: 'db-inspector:select-file',
+  DB_INSPECTOR_INSPECT: 'db-inspector:inspect',
+  DB_INSPECTOR_GET_DEFAULT_PATH: 'db-inspector:get-default-path',
+  DB_INSPECTOR_LIST_BACKUPS: 'db-inspector:list-backups',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

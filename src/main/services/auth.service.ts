@@ -317,9 +317,8 @@ export class AuthService {
 
     // التحقق من الصلاحيات الإدارية لتعيين المالك
     if (input.role === USER_ROLES.OWNER) {
-      const activeOwners = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'owner' AND is_active = 1").get() as { count: number };
-      if (activeOwners.count > 0 && !actorUserId) {
-        throw new Error('غير مصرح بإنشاء حساب مالك جديد دون تفويض من المالك الحالي.');
+      if (!isAllowedAdminUsername(input.username)) {
+        throw new Error('غير مصرح بتعيين هذا الحساب كمدير/مالك. الحسابات الإدارية المعتمدة محددة مسبقاً فقط.');
       }
     }
 

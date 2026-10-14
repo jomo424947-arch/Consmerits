@@ -24,6 +24,7 @@ const tabTitles: Record<NavTab, string> = {
   cash: 'الخزنة وإدارة الورديات والمصروفات',
   reports: 'التقارير والإحصائيات ولوحة التحكم',
   settings: 'إعدادات النظام والمستخدمين والنسخ الاحتياطي',
+  'db-inspector': 'مستكشف وفاحص قواعد البيانات SQLite',
 };
 
 const hotkeyMap: Record<string, NavTab> = {

@@ -5,6 +5,7 @@ import { GlassIcon } from '../../components/common/GlassIcon';
 import { SafeUser } from '../../../shared/types/users.types';
 import { ROLE_LABELS } from '../../../shared/constants/roles';
 import { sounds } from '../../lib/sounds';
+import logoImg from '../../assets/logo.png';
 
 interface LockScreenProps {
   currentUser: SafeUser;
@@ -193,28 +194,59 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
           {currentTime}
         </div>
 
-        {/* Lock Icon */}
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: 20,
-            background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF0F3 100%)',
-            border: '2px solid #FF95A5',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 10px 24px -4px rgba(255, 149, 165, 0.35)',
-          }}
-        >
-          <Lock size={30} color="#FF7088" strokeWidth={2.4} />
+        {/* Boutique Gouri Logo Badge with Lock Badge */}
+        <div style={{ position: 'relative', marginTop: 2 }}>
+          <div
+            style={{
+              width: 76,
+              height: 76,
+              borderRadius: '50%',
+              padding: 2.5,
+              background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
+              boxShadow: '0 10px 24px -4px rgba(255, 112, 136, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={logoImg}
+              alt="Boutique Gouri Logo"
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: -2,
+              right: -2,
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              backgroundColor: '#FF6584',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              border: '2px solid #FFFFFF',
+            }}
+          >
+            <Lock size={13} color="#FFFFFF" strokeWidth={2.6} />
+          </div>
         </div>
 
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#111827' }}>
-            الشاشة مقفلة للحماية
+          <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#111827' }}>
+            Boutique Gouri • الشاشة مقفلة
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4B5563', fontWeight: 600 }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#FF6584', fontWeight: 600 }}>
             أدخل رمز PIN لاستئناف العمل بالوردية
           </p>
         </div>

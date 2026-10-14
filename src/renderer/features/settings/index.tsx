@@ -18,6 +18,7 @@ import { AuditLogPage } from '../audit/AuditLogPage';
 import { sounds } from '../../lib/sounds';
 import { useToast } from '../../components/common/ToastContext';
 import { MESSAGES } from '../../lib/messages';
+import logoImg from '../../assets/logo.png';
 
 type SettingsTab = 'store' | 'users' | 'backup' | 'audit';
 
@@ -40,7 +41,7 @@ export function SettingsScreen(): React.ReactElement {
   const [activeSubTab, setActiveSubTab] = useState<SettingsTab>('store');
 
   // بيانات المحل
-  const [storeName, setStoreName] = useState('محل مستحضرات التجميل والعطور');
+  const [storeName, setStoreName] = useState('بوتيك جوري - Boutique Gouri');
   const [storeAddress, setStoreAddress] = useState('شارع التحرير، الدقي، الجيزة');
   const [storePhone, setStorePhone] = useState('01012345678');
   const [taxNumber, setTaxNumber] = useState('300-456-789');
@@ -185,6 +186,54 @@ export function SettingsScreen(): React.ReactElement {
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-brand-deep)', margin: 0 }}>
                     بيانات المتجر والترويسة للإيصالات
                   </h3>
+                </div>
+
+                {/* الشعار الرسمي للمتجر */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                    padding: '12px 16px',
+                    borderRadius: 14,
+                    backgroundColor: '#FFF5F7',
+                    border: '1px solid rgba(255, 149, 165, 0.35)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      minWidth: 52,
+                      borderRadius: '50%',
+                      padding: 2,
+                      background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
+                      boxShadow: '0 4px 12px rgba(255, 112, 136, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={logoImg}
+                      alt="Boutique Gouri Logo"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#111827' }}>
+                      الشعار المعتمد: Boutique Gouri
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 2 }}>
+                      مدمج كأيقونة أساسية للتطبيق، ملف الـ .exe، وشاشات البيع وتسجيل الدخول
+                    </div>
+                  </div>
                 </div>
 
                 <div>

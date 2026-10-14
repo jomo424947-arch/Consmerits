@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, KeyRound, User, Lock, AlertCircle, Delete } from 'lucide-react';
 import { SafeUser } from '../../../shared/types/users.types';
 import { sounds } from '../../lib/sounds';
+import logoImg from '../../assets/logo.png';
 
 interface LoginPageProps {
   onLoginSuccess: (user: SafeUser) => void;
@@ -241,24 +242,34 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
           zIndex: 10,
         }}
       >
-        {/* رأس البطاقة والشعار (Header & Luxury Emblem) */}
+        {/* رأس البطاقة وشعار Boutique Gouri */}
         <div style={{ textAlign: 'center' }}>
           <div
             style={{
-              width: 72,
-              height: 72,
-              borderRadius: 22,
-              background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF0F3 100%)',
-              border: '2px solid #FF95A5',
+              width: 90,
+              height: 90,
+              borderRadius: '50%',
+              padding: 3,
+              background: 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)',
+              boxShadow: '0 12px 30px -4px rgba(255, 112, 136, 0.4), 0 4px 10px rgba(0, 0, 0, 0.04)',
+              margin: '0 auto 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 16px',
-              boxShadow: '0 12px 28px -6px rgba(255, 149, 165, 0.35), 0 4px 10px rgba(0, 0, 0, 0.03)',
               position: 'relative',
             }}
           >
-            <Sparkles size={36} color="#FF7088" strokeWidth={2.4} />
+            <img
+              src={logoImg}
+              alt="Boutique Gouri Logo"
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
           </div>
 
           <h1
@@ -271,17 +282,17 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps): React.ReactElemen
               lineHeight: 1.3,
             }}
           >
-            نظام بيع وجرد مستحضرات التجميل
+            Boutique Gouri • بوتيك جوري
           </h1>
           <p
             style={{
               margin: '6px 0 0',
-              fontSize: 13.5,
-              color: '#374151',
-              fontWeight: 600,
+              fontSize: 13,
+              color: '#FF6584',
+              fontWeight: 700,
             }}
           >
-            سجّل دخولك لبدء الوردية وإدارة المبيعات الآمنة
+            BEAUTY & COSMETICS • نظام المبيعات ونقاط البيع
           </p>
         </div>
 

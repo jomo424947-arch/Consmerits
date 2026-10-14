@@ -26,6 +26,8 @@ export function useProducts() {
             unit: p.unit || 'قطعة',
             primaryBarcode: p.variants?.[0]?.barcodes?.[0] || '---',
             price: p.variants?.[0]?.sale_price || 0,
+            variantId: p.variants?.[0]?.id,
+            isActive: p.is_active ?? 1,
           }));
           setProducts(mapped);
           return;

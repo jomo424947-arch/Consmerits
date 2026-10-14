@@ -14,6 +14,9 @@ import {
   VariantDetail,
   ProductLookupResult,
   Batch,
+  ProductPriceHistory,
+  DeleteProductResult,
+  StockCardItem,
 } from '../../shared/types/products.types';
 import {
   CreateProductInput,
@@ -254,7 +257,7 @@ export class ProductsService {
   }
 
   /**
-   * تحديث بيانات المنتج الأساسية
+   * تحديث بيانات المنتج والأسعار والـ Variants وتوثيق الفروقات بدقة
    */
   async updateProduct(
     id: number,
@@ -264,6 +267,20 @@ export class ProductsService {
     const db = this.getDb();
 
     const updateTx = db.transaction(() => {
+      // 1. جلب البيانات القديمة للمقارنة وتوثيق الفروقات
+      const oldProduct = this.getProductDetails(id);
+      const primaryVariant = oldProduct.variants[0];
+
+      let categoryId = input.category_id;
+      if (categoryId === undefined && input.category_name && input.category_name.trim()) {
+        categoryId = this.getOrCreateCategory(input.category_name);
+      }
+
+      let brandId = input.brand_id;
+      if (brandId === undefined && input.brand_name && input.brand_name.trim()) {
+        brandId = this.getOrCreateBrand(input.brand_name);
+      }
+
       const updates: string[] = ["updated_at = datetime('now')"];
       const params: any[] = [];
 
@@ -275,13 +292,13 @@ export class ProductsService {
         updates.push('name_en = ?');
         params.push(input.name_en?.trim() ?? null);
       }
-      if (input.category_id !== undefined) {
+      if (categoryId !== undefined) {
         updates.push('category_id = ?');
-        params.push(input.category_id);
+        params.push(categoryId);
       }
-      if (input.brand_id !== undefined) {
+      if (brandId !== undefined) {
         updates.push('brand_id = ?');
-        params.push(input.brand_id);
+        params.push(brandId);
       }
       if (input.unit !== undefined) {
         updates.push('unit = ?');
@@ -299,19 +316,312 @@ export class ProductsService {
       params.push(id);
       db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
+      // 2. تحديث الـ Variant والأسعار
+      const targetVariantId = input.variant_id || primaryVariant?.id;
+      const targetSalePrice = input.sale_price !== undefined ? input.sale_price : input.selling_price;
+
+      if (targetVariantId) {
+        const vUpdates: string[] = [];
+        const vParams: any[] = [];
+
+        if (targetSalePrice !== undefined) {
+          vUpdates.push('sale_price = ?');
+          vParams.push(targetSalePrice);
+
+          // فحص هل تغير السعر
+          const oldPrice = primaryVariant?.sale_price ?? 0;
+          if (oldPrice !== targetSalePrice) {
+            // تسجيل في تاريخ تغير الأسعار
+            try {
+              db.prepare(`
+                INSERT INTO product_price_history (variant_id, old_price, new_price, user_id, reason, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+              `).run(
+                targetVariantId,
+                oldPrice,
+                targetSalePrice,
+                actorUserId ?? null,
+                input.price_change_reason || 'تعديل السعر من بطاقة الصنف'
+              );
+            } catch {
+              // احتياط أمان
+            }
+
+            // توثيق حركة تغيير السعر في سجل الرقابة
+            if (actorUserId) {
+              this.auditService.log({
+                userId: actorUserId,
+                action: 'PRODUCT_PRICE_CHANGED',
+                entityType: 'products',
+                entityId: id,
+                details: {
+                  product_name: input.name_ar || oldProduct.name_ar,
+                  old_price: oldPrice,
+                  new_price: targetSalePrice,
+                  reason: input.price_change_reason,
+                },
+              });
+            }
+          }
+        }
+
+        if (input.min_stock !== undefined) {
+          vUpdates.push('min_stock = ?');
+          vParams.push(input.min_stock);
+        }
+
+        if (vUpdates.length > 0) {
+          vParams.push(targetVariantId);
+          db.prepare(`UPDATE product_variants SET ${vUpdates.join(', ')} WHERE id = ?`).run(...vParams);
+        }
+
+        // 3. تحديث الباركود
+        const newBarcodes = input.barcodes || (input.barcode ? [input.barcode.trim()] : null);
+        if (newBarcodes && newBarcodes.length > 0) {
+          const barcode = newBarcodes[0].trim();
+          if (barcode) {
+            const existingSame = db
+              .prepare('SELECT id FROM product_barcodes WHERE variant_id = ? AND barcode = ?')
+              .get(targetVariantId, barcode);
+
+            if (!existingSame) {
+              const existingOther = db
+                .prepare('SELECT id, variant_id FROM product_barcodes WHERE barcode = ?')
+                .get(barcode) as { id: number; variant_id: number } | undefined;
+
+              if (existingOther && existingOther.variant_id !== targetVariantId) {
+                throw new Error(`الباركود "${barcode}" مستخدم بالفعل لمنتج آخر`);
+              }
+
+              db.prepare('DELETE FROM product_barcodes WHERE variant_id = ?').run(targetVariantId);
+              const isInternal = barcode.startsWith('20') ? 1 : 0;
+              db.prepare('INSERT INTO product_barcodes (variant_id, barcode, is_internal) VALUES (?, ?, ?)').run(
+                targetVariantId,
+                barcode,
+                isInternal
+              );
+            }
+          }
+        }
+      }
+
+      // 4. توثيق التحديث العام في سجل الرقابة
       if (actorUserId) {
+        const changes: Record<string, { old: any; new: any }> = {};
+        if (input.name_ar !== undefined && input.name_ar !== oldProduct.name_ar) {
+          changes.name_ar = { old: oldProduct.name_ar, new: input.name_ar };
+        }
+        if (targetSalePrice !== undefined && targetSalePrice !== primaryVariant?.sale_price) {
+          changes.sale_price = { old: primaryVariant?.sale_price, new: targetSalePrice };
+        }
+        if (input.unit !== undefined && input.unit !== oldProduct.unit) {
+          changes.unit = { old: oldProduct.unit, new: input.unit };
+        }
+
         this.auditService.log({
           userId: actorUserId,
           action: 'UPDATE_PRODUCT',
           entityType: 'products',
           entityId: id,
-          details: input as Record<string, unknown>,
+          details: {
+            changes,
+            input_summary: input,
+          },
         });
       }
     });
 
     updateTx();
     return this.getProductDetails(id);
+  }
+
+  /**
+   * حذف ذكي للمنتج (حذف نهائي إذا لم تكن له حركات، أو أرشفة آمنة إذا كانت له مبيعات/حركات سابقة)
+   */
+  async deleteProduct(id: number, actorUserId?: number): Promise<DeleteProductResult> {
+    const db = this.getDb();
+    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as Product | undefined;
+    if (!product) {
+      throw new Error(`المنتج برقم ${id} غير موجود`);
+    }
+
+    const variants = db
+      .prepare('SELECT id FROM product_variants WHERE product_id = ?')
+      .all(id) as { id: number }[];
+    const variantIds = variants.map((v) => v.id);
+
+    let hasSales = false;
+    let hasMovements = false;
+    let hasPurchases = false;
+
+    if (variantIds.length > 0) {
+      const placeholders = variantIds.map(() => '?').join(',');
+
+      // 1. فحص المبيعات
+      const saleCount = db
+        .prepare(`SELECT COUNT(*) as count FROM sale_items WHERE variant_id IN (${placeholders})`)
+        .get(...variantIds) as { count: number };
+      if (saleCount.count > 0) hasSales = true;
+
+      // 2. فحص المشتريات
+      const purchaseCount = db
+        .prepare(`SELECT COUNT(*) as count FROM purchase_items WHERE variant_id IN (${placeholders})`)
+        .get(...variantIds) as { count: number };
+      if (purchaseCount.count > 0) hasPurchases = true;
+
+      // 3. فحص الدفعات ذات الرصيد أو الحركات
+      const batches = db
+        .prepare(`SELECT id, qty_remaining FROM batches WHERE variant_id IN (${placeholders})`)
+        .all(...variantIds) as { id: number; qty_remaining: number }[];
+
+      if (batches.length > 0) {
+        const batchIds = batches.map((b) => b.id);
+        const bPlaceholders = batchIds.map(() => '?').join(',');
+        const moveCount = db
+          .prepare(`SELECT COUNT(*) as count FROM stock_movements WHERE batch_id IN (${bPlaceholders})`)
+          .get(...batchIds) as { count: number };
+        if (moveCount.count > 0) hasMovements = true;
+      }
+    }
+
+    const hasHistory = hasSales || hasMovements || hasPurchases;
+
+    if (hasHistory) {
+      // أرشفة آمنة (Soft Delete)
+      db.transaction(() => {
+        db.prepare("UPDATE products SET is_active = 0, updated_at = datetime('now') WHERE id = ?").run(id);
+        if (variantIds.length > 0) {
+          const placeholders = variantIds.map(() => '?').join(',');
+          db.prepare(`UPDATE product_variants SET is_active = 0 WHERE id IN (${placeholders})`).run(...variantIds);
+        }
+
+        if (actorUserId) {
+          this.auditService.log({
+            userId: actorUserId,
+            action: 'ARCHIVE_PRODUCT',
+            entityType: 'products',
+            entityId: id,
+            details: {
+              product_name: product.name_ar,
+              reason: 'أرشفة المنتج لوجود حركات مبيعات أو مخزون سابقة',
+              has_sales: hasSales,
+              has_movements: hasMovements,
+            },
+          });
+        }
+      })();
+
+      return {
+        success: true,
+        action: 'archived',
+        message: `تم أرشفة المنتج "${product.name_ar}" وإخفاؤه بنجاح نظراً لوجود مبيعات أو حركات مخزون سابقة مرتبطة به.`,
+      };
+    } else {
+      // حذف نهائي كامل (Hard Delete)
+      db.transaction(() => {
+        if (variantIds.length > 0) {
+          const placeholders = variantIds.map(() => '?').join(',');
+
+          db.prepare(`DELETE FROM product_barcodes WHERE variant_id IN (${placeholders})`).run(...variantIds);
+          db.prepare(`DELETE FROM batches WHERE variant_id IN (${placeholders})`).run(...variantIds);
+
+          try {
+            db.prepare(`DELETE FROM product_price_history WHERE variant_id IN (${placeholders})`).run(...variantIds);
+          } catch {}
+
+          try {
+            db.prepare(`DELETE FROM promotion_items WHERE variant_id IN (${placeholders}) OR product_id = ?`).run(...variantIds, id);
+          } catch {}
+
+          db.prepare(`DELETE FROM product_variants WHERE product_id = ?`).run(id);
+        }
+
+        db.prepare('DELETE FROM products WHERE id = ?').run(id);
+
+        if (actorUserId) {
+          this.auditService.log({
+            userId: actorUserId,
+            action: 'DELETE_PRODUCT',
+            entityType: 'products',
+            entityId: id,
+            details: {
+              product_name: product.name_ar,
+              note: 'حذف نهائي لعدم وجود أي مبيعات أو حركات مخزون سابقة',
+            },
+          });
+        }
+      })();
+
+      return {
+        success: true,
+        action: 'deleted',
+        message: `تم حذف المنتج "${product.name_ar}" نهائياً من قاعدة البيانات بنجاح.`,
+      };
+    }
+  }
+
+  /**
+   * جلب سجل وتاريخ تغير أسعار المنتج
+   */
+  getProductPriceHistory(productId: number): ProductPriceHistory[] {
+    const db = this.getDb();
+    try {
+      const rows = db
+        .prepare(`
+          SELECT 
+            h.id,
+            h.variant_id,
+            h.old_price,
+            h.new_price,
+            h.user_id,
+            u.display_name as user_name,
+            h.reason,
+            h.created_at
+          FROM product_price_history h
+          JOIN product_variants v ON h.variant_id = v.id
+          LEFT JOIN users u ON h.user_id = u.id
+          WHERE v.product_id = ?
+          ORDER BY h.id DESC
+        `)
+        .all(productId) as ProductPriceHistory[];
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * جلب كارت حركة الصنف (Stock Card)
+   */
+  getProductStockCard(productId: number): StockCardItem[] {
+    const db = this.getDb();
+    try {
+      const rows = db
+        .prepare(`
+          SELECT 
+            sm.id,
+            sm.type,
+            sm.qty,
+            sm.ref_type,
+            sm.ref_id,
+            u.display_name as user_name,
+            sm.note,
+            sm.created_at,
+            b.batch_no,
+            b.expiry_date
+          FROM stock_movements sm
+          JOIN batches b ON sm.batch_id = b.id
+          JOIN product_variants v ON b.variant_id = v.id
+          LEFT JOIN users u ON sm.user_id = u.id
+          WHERE v.product_id = ?
+          ORDER BY sm.id DESC
+          LIMIT 100
+        `)
+        .all(productId) as StockCardItem[];
+      return rows;
+    } catch {
+      return [];
+    }
   }
 
   /**
