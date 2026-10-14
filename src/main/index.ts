@@ -57,8 +57,6 @@ app.whenReady().then(async () => {
   // فتح قاعدة البيانات وتطبيق أي ترحيلات جديدة
   try {
     initializeDatabase();
-    // التأكد من وجود حساب المالك الافتراضي إذا كانت القاعدة جديدة
-    authService.seedDefaultOwnerIfNone();
     // فحص سلامة قاعدة البيانات الأسبوعي الخفيف في الخلفية
     backupService.weeklyIntegrityCheck();
   } catch (err) {

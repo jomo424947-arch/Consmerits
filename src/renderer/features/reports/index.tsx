@@ -273,53 +273,41 @@ export function ReportsScreen(): React.ReactElement {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={TrendingUp} size="lg" variant="brand" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المبيعات</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {formatMoney(stats.totalSales)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المبيعات</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {formatMoney(stats.totalSales)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={ShoppingBag} size="lg" variant="primary" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الفواتير الصادرة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {stats.invoiceCount} فاتورة
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الفواتير الصادرة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {stats.invoiceCount} فاتورة
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Sparkles} size="lg" variant="success" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>صافي الربح التقديري</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D' }}>
-              {formatMoney(stats.totalProfit)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>صافي الربح التقديري</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D', marginTop: 4 }}>
+            {formatMoney(stats.totalProfit)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Coins} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>متوسط الفاتورة للعميل</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910' }}>
-              {formatMoney(stats.avgTicket)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>متوسط الفاتورة للعميل</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910', marginTop: 4 }}>
+            {formatMoney(stats.avgTicket)}
           </div>
         </div>
       </div>

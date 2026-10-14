@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Typography & Iconography — Alexandria + Material Symbols Outlined
+   متوافق كلياً مع نظام CCMS ويعمل محلياً بدون إنترنت (100% Offline Capable)
+   ========================================================================== */
+
+/* Alexandria - Arabic (Local bundle) */
+@font-face {
+  font-family: 'Alexandria';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('../assets/fonts/Alexandria-Arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
+/* Alexandria - Latin (Local bundle) */
+@font-face {
+  font-family: 'Alexandria';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('../assets/fonts/Alexandria-Latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Space Grotesk - Numerals & Display (Local bundle) */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('../assets/fonts/SpaceGrotesk.woff2') format('woff2');
+}
+
+/* Material Symbols Outlined (Local bundle) */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('../assets/fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+}
+
+/* فئة الخط الأيقوني المطابقة تماماً لنظام CCMS */
+.material-symbols-outlined,
+.material-symbols-sharp,
+.material-symbols-rounded,
+[class*="material-symbols"] {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr !important;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  vertical-align: middle;
+}

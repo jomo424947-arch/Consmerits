@@ -230,9 +230,9 @@ export function UsersPage(): React.ReactElement {
 
                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                   {u.is_active === 1 ? (
-                    <span className="badge badge-success">نشط ومفعل ✓</span>
+                    <span className="badge badge-success">نشط ومفعل</span>
                   ) : (
-                    <span className="badge badge-danger">معطل ✕</span>
+                    <span className="badge badge-danger">معطل</span>
                   )}
                 </td>
 

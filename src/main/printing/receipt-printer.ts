@@ -11,6 +11,9 @@ import { formatPiastersToPounds } from '../../shared/utils/money';
 
 export interface ReceiptConfig {
   storeName: string;
+  storePhone?: string;
+  storeAddress?: string;
+  taxNumber?: string;
   header: string;
   footer: string;
   widthMm: number;
@@ -42,7 +45,10 @@ export class ReceiptPrinter {
     rows.forEach((r) => map.set(r.key, r.value));
 
     return {
-      storeName: map.get('store_name') ?? 'محل مستحضرات التجميل',
+      storeName: map.get('store_name') ?? 'قصر الملكة',
+      storePhone: map.get('store_phone') ?? '',
+      storeAddress: map.get('store_address') ?? '',
+      taxNumber: map.get('tax_number') ?? '',
       header: map.get('receipt_header') ?? 'أهلاً بكم في متجرنا',
       footer: map.get('receipt_footer') ?? 'شكراً لزيارتكم ونسعد بخدمتكم دائماً',
       widthMm: parseInt(map.get('receipt_width_mm') ?? '80', 10),
@@ -57,18 +63,19 @@ export class ReceiptPrinter {
     const cfg = config ?? this.getReceiptConfig();
     const items = sale.items ?? [];
     const payments = sale.payments ?? [];
+    const printableWidthMm = cfg.widthMm >= 80 ? 70 : 48;
 
     const itemsHtml = items
       .map(
         (it) => `
-        <tr style="border-bottom: 1px dashed #ccc;">
-          <td style="padding: 4px 0; text-align: right;">
+        <tr style="border-bottom: 1px dashed #bbb;">
+          <td style="width: 44%; padding: 4px 2px; text-align: right; word-break: break-word;">
             <div><strong>${it.product_name}</strong></div>
-            ${it.variant_name ? `<small style="color: #666;">${it.variant_name}</small>` : ''}
+            ${it.variant_name ? `<small style="color: #555; display: block; font-size: 9.5px;">${it.variant_name}</small>` : ''}
           </td>
-          <td style="padding: 4px; text-align: center;">${it.qty}</td>
-          <td style="padding: 4px; text-align: center;">${formatPiastersToPounds(it.unit_price)}</td>
-          <td style="padding: 4px 0; text-align: left;"><strong>${formatPiastersToPounds(it.line_total)}</strong></td>
+          <td style="width: 14%; padding: 4px 2px; text-align: center; vertical-align: top;">${it.qty}</td>
+          <td style="width: 20%; padding: 4px 2px; text-align: center; vertical-align: top;">${formatPiastersToPounds(it.unit_price)}</td>
+          <td style="width: 22%; padding: 4px 2px; text-align: left; vertical-align: top;"><strong>${formatPiastersToPounds(it.line_total)}</strong></td>
         </tr>
       `
       )
@@ -83,9 +90,9 @@ export class ReceiptPrinter {
           credit: 'آجل / حساب عميل',
         };
         return `
-          <div style="display: flex; justify-content: space-between; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0;">
             <span>${methodAr[p.method] ?? p.method}:</span>
-            <span>${formatPiastersToPounds(p.amount)} ${cfg.currency}</span>
+            <span style="font-weight: 600;">${formatPiastersToPounds(p.amount)} ${cfg.currency}</span>
           </div>
         `;
       })
@@ -97,51 +104,73 @@ export class ReceiptPrinter {
       <head>
         <meta charset="utf-8">
         <style>
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
           @page {
             margin: 0;
             size: ${cfg.widthMm}mm auto;
           }
           body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            width: ${cfg.widthMm}mm;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, Arial, sans-serif;
+            width: ${printableWidthMm}mm;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 8px;
-            font-size: 12px;
+            padding: 6px 4px 14px 4px;
+            font-size: 11.5px;
             color: #000;
             background: #fff;
+            direction: rtl;
+            -webkit-print-color-adjust: exact;
           }
-          .header { text-align: center; margin-bottom: 8px; }
-          .store-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
-          .sub-header { font-size: 11px; color: #444; }
+          .header { text-align: center; margin-bottom: 6px; }
+          .store-name { font-size: 16.5px; font-weight: 800; margin-bottom: 2px; }
+          .store-info { font-size: 10.5px; color: #333; margin-bottom: 2px; }
+          .sub-header { font-size: 11px; color: #444; margin-top: 2px; }
           .divider { border-top: 1px dashed #000; margin: 6px 0; }
-          .meta { font-size: 11px; margin-bottom: 6px; }
-          .meta-row { display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 6px; }
-          .totals { font-size: 12px; line-height: 1.5; }
-          .totals-row { display: flex; justify-content: space-between; }
-          .total-highlight { font-size: 15px; font-weight: bold; border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
-          .footer { text-align: center; font-size: 11px; margin-top: 10px; color: #333; }
+          .meta { font-size: 11px; line-height: 1.5; margin-bottom: 4px; }
+          .meta-row { display: flex; justify-content: space-between; align-items: center; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 4px; table-layout: fixed; }
+          th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 2px; font-weight: bold; }
+          td { padding: 4px 2px; }
+          .totals { font-size: 11.5px; line-height: 1.5; }
+          .totals-row { display: flex; justify-content: space-between; align-items: center; }
+          .total-highlight {
+            font-size: 14.5px;
+            font-weight: 800;
+            border-top: 1.5px solid #000;
+            border-bottom: 1.5px solid #000;
+            padding: 4px 0;
+            margin-top: 4px;
+          }
+          .payments { font-size: 11px; line-height: 1.5; margin-top: 4px; }
+          .footer { text-align: center; font-size: 10.5px; margin-top: 10px; color: #333; line-height: 1.4; }
         </style>
       </head>
       <body>
         <div class="header">
           <div class="store-name">${cfg.storeName}</div>
+          ${cfg.storeAddress ? `<div class="store-info">${cfg.storeAddress}</div>` : ''}
+          ${cfg.storePhone ? `<div class="store-info">هاتف: ${cfg.storePhone}</div>` : ''}
+          ${cfg.taxNumber ? `<div class="store-info">الرقم الضريبي: ${cfg.taxNumber}</div>` : ''}
           <div class="sub-header">${cfg.header}</div>
         </div>
         <div class="divider"></div>
         <div class="meta">
-          <div class="meta-row"><span>رقم الفاتورة:</span><strong>${sale.invoice_no}</strong></div>
+          <div class="meta-row"><span>رقم الفاتورة:</span><strong style="font-family: monospace; font-size: 12px;">${sale.invoice_no}</strong></div>
           <div class="meta-row"><span>التاريخ:</span><span>${sale.created_at}</span></div>
-          <div class="meta-row"><span>الوردية:</span><span>#${sale.shift_id}</span></div>
+          <div class="meta-row"><span>الوردية:</span><span>وردية رقم #${sale.shift_id}</span></div>
         </div>
         <div class="divider"></div>
         <table>
           <thead>
-            <tr style="border-bottom: 1px solid #000;">
-              <th style="text-align: right;">الصنف</th>
-              <th style="text-align: center;">العدد</th>
-              <th style="text-align: center;">السعر</th>
-              <th style="text-align: left;">الإجمالي</th>
+            <tr>
+              <th style="width: 44%; text-align: right;">الصنف</th>
+              <th style="width: 14%; text-align: center;">العدد</th>
+              <th style="width: 20%; text-align: center;">السعر</th>
+              <th style="width: 22%; text-align: left;">الإجمالي</th>
             </tr>
           </thead>
           <tbody>
@@ -150,22 +179,25 @@ export class ReceiptPrinter {
         </table>
         <div class="divider"></div>
         <div class="totals">
-          <div class="totals-row"><span>الإجمالي:</span><span>${formatPiastersToPounds(sale.subtotal)} ${cfg.currency}</span></div>
-          ${sale.discount_amount > 0 ? `<div class="totals-row" style="color: #b00;"><span>الخصم:</span><span>-${formatPiastersToPounds(sale.discount_amount)} ${cfg.currency}</span></div>` : ''}
+          <div class="totals-row"><span>إجمالي الأصناف:</span><span>${formatPiastersToPounds(sale.subtotal)} ${cfg.currency}</span></div>
+          ${sale.discount_amount > 0 ? `<div class="totals-row"><span>الخصم:</span><span>-${formatPiastersToPounds(sale.discount_amount)} ${cfg.currency}</span></div>` : ''}
           ${sale.tax_amount > 0 ? `<div class="totals-row"><span>الضريبة:</span><span>+${formatPiastersToPounds(sale.tax_amount)} ${cfg.currency}</span></div>` : ''}
           <div class="totals-row total-highlight">
             <span>الصافي المطلوب:</span>
             <span>${formatPiastersToPounds(sale.total)} ${cfg.currency}</span>
           </div>
         </div>
+        ${paymentsHtml ? `
         <div class="divider"></div>
         <div class="payments">
           <div style="font-weight: bold; font-size: 11px; margin-bottom: 2px;">طرق الدفع:</div>
           ${paymentsHtml}
         </div>
+        ` : ''}
         <div class="divider"></div>
         <div class="footer">
           <div>${cfg.footer}</div>
+          <div style="font-size: 9.5px; color: #666; margin-top: 4px;">البضاعة المباعة تستبدل خلال 14 يوماً بالفاتورة</div>
         </div>
       </body>
       </html>

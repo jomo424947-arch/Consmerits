@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, User, AlertCircle, ArrowLeftRight } from 'lucide-react';
+import { Lock, User, AlertCircle, ArrowLeftRight, Delete } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { GlassIcon } from '../../components/common/GlassIcon';
 import { SafeUser } from '../../../shared/types/users.types';
@@ -45,8 +45,14 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
       if (e.key >= '0' && e.key <= '9') {
         e.preventDefault();
         sounds.playClick();
-        setPin((prev) => (prev.length < 6 ? prev + e.key : prev));
-        setError(null);
+        if (pin.length < 4) {
+          const nextPin = pin + e.key;
+          setPin(nextPin);
+          setError(null);
+          if (nextPin.length === 4) {
+            handleUnlock(nextPin);
+          }
+        }
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         sounds.playClick();
@@ -72,9 +78,13 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
 
   const handleDigit = (digit: string) => {
     sounds.playClick();
-    if (pin.length < 6) {
-      setPin((prev) => prev + digit);
+    if (pin.length < 4) {
+      const nextPin = pin + digit;
+      setPin(nextPin);
       setError(null);
+      if (nextPin.length === 4) {
+        handleUnlock(nextPin);
+      }
     }
   };
 
@@ -90,9 +100,10 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
     setError(null);
   };
 
-  const handleUnlock = async () => {
-    if (!pin) {
-      triggerError('يرجى إدخال رمز PIN لفتح القفل');
+  const handleUnlock = async (pinOverride?: string) => {
+    const effectivePin = pinOverride || pin;
+    if (!effectivePin || effectivePin.length !== 4) {
+      triggerError('يرجى إدخال رمز PIN المكون من 4 أرقام');
       return;
     }
 
@@ -107,7 +118,7 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
         return;
       }
 
-      const res = await electron.loginWithPin(pin);
+      const res = await electron.loginWithPin(effectivePin);
       if (res?.success && (res.user?.id === currentUser.id || res.user)) {
         sounds.playSaleSuccess();
         await electron.unlockScreen?.();
@@ -128,27 +139,37 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'radial-gradient(circle at 50% 30%, rgba(47, 74, 62, 0.94) 0%, rgba(20, 32, 26, 0.97) 100%)',
+        backgroundColor: '#FFFFFF',
+        backgroundImage: `
+          radial-gradient(circle at 85% 15%, rgba(255, 149, 165, 0.18) 0%, transparent 48%),
+          radial-gradient(circle at 15% 85%, rgba(255, 149, 165, 0.08) 0%, transparent 50%),
+          #FFFFFF
+        `,
         backdropFilter: 'blur(28px)',
         WebkitBackdropFilter: 'blur(28px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         direction: 'rtl',
-        color: '#FFFFFF',
+        color: '#111827',
         userSelect: 'none',
         padding: 20,
+        fontFamily: 'var(--font-family, system-ui, sans-serif)',
       }}
     >
       <div
         className={isShaking ? 'animate-shake' : 'animate-scale-in'}
         style={{
           width: '100%',
-          maxWidth: 390,
-          background: 'rgba(255, 255, 255, 0.08)',
-          borderRadius: 24,
-          border: '1px solid rgba(255, 255, 255, 0.18)',
-          boxShadow: '0 30px 70px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.25)',
+          maxWidth: 410,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 28,
+          border: '1.5px solid rgba(255, 149, 165, 0.25)',
+          boxShadow: `
+            0 25px 60px -15px rgba(255, 149, 165, 0.18),
+            0 12px 28px -6px rgba(0, 0, 0, 0.04),
+            0 0 0 1px #F3F4F6
+          `,
           padding: '32px 28px',
           display: 'flex',
           flexDirection: 'column',
@@ -157,18 +178,43 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
         }}
       >
         {/* ساعة القفل */}
-        <div style={{ fontSize: 13, color: '#E3EAE5', fontWeight: 500, letterSpacing: '0.2px' }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: '#4B5563',
+            fontWeight: 600,
+            letterSpacing: '0.2px',
+            backgroundColor: '#F9FAFB',
+            padding: '4px 14px',
+            borderRadius: 20,
+            border: '1.5px solid #E5E7EB',
+          }}
+        >
           {currentTime}
         </div>
 
         {/* Lock Icon */}
-        <GlassIcon icon={Lock} size="xl" variant="gold" glow />
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 20,
+            background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF0F3 100%)',
+            border: '2px solid #FF95A5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 24px -4px rgba(255, 149, 165, 0.35)',
+          }}
+        >
+          <Lock size={30} color="#FF7088" strokeWidth={2.4} />
+        </div>
 
         <div style={{ textAlign: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: '#FFFFFF' }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#111827' }}>
             الشاشة مقفلة للحماية
-          </h3>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255, 255, 255, 0.65)' }}>
+          </h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4B5563', fontWeight: 600 }}>
             أدخل رمز PIN لاستئناف العمل بالوردية
           </p>
         </div>
@@ -177,21 +223,34 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
         <div
           style={{
             width: '100%',
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: '#FFFFFF',
             borderRadius: 14,
             padding: '10px 14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             boxSizing: 'border-box',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            border: '1.5px solid #E5E7EB',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GlassIcon icon={User} size="xs" variant="primary" />
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                backgroundColor: '#F9FAFB',
+                border: '1px solid #E5E7EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <User size={16} color="#FF7088" />
+            </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{currentUser.display_name}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.6)' }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: '#111827' }}>{currentUser.display_name}</div>
+              <div style={{ fontSize: 11.5, color: '#6B7280', fontWeight: 600 }}>
                 {ROLE_LABELS[currentUser.role] || currentUser.role}
               </div>
             </div>
@@ -205,17 +264,19 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
-              background: 'transparent',
-              border: 'none',
-              color: '#F4E8C1',
+              gap: 5,
+              background: '#FFFFFF',
+              border: '1.5px solid #E5E7EB',
+              borderRadius: 8,
+              padding: '6px 10px',
+              color: '#BE123C',
               fontSize: 12,
               cursor: 'pointer',
-              fontWeight: 600,
+              fontWeight: 700,
             }}
           >
             <ArrowLeftRight size={13} />
-            <span>تبديل المستخدم</span>
+            <span>تبديل</span>
           </button>
         </div>
 
@@ -224,11 +285,13 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
             className="animate-slide-up"
             style={{
               width: '100%',
-              backgroundColor: 'rgba(239, 68, 68, 0.2)',
-              borderRadius: 8,
+              backgroundColor: '#FFF1F2',
+              border: '1.5px solid #FECDD3',
+              borderRadius: 10,
               padding: '8px 12px',
-              color: '#FCA5A5',
-              fontSize: 12,
+              color: '#BE123C',
+              fontSize: 12.5,
+              fontWeight: 700,
               textAlign: 'center',
               display: 'flex',
               alignItems: 'center',
@@ -236,7 +299,7 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
               gap: 6,
             }}
           >
-            <AlertCircle size={14} />
+            <AlertCircle size={15} color="#E11D48" />
             <span>{error}</span>
           </div>
         )}
@@ -245,24 +308,39 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
         <div
           style={{
             display: 'flex',
-            gap: 12,
-            padding: '4px 0',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 18,
+            height: 48,
+            width: '100%',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            border: '1.5px solid #E5E7EB',
+            boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)',
           }}
         >
-          {[0, 1, 2, 3, 4, 5].map((idx) => (
-            <div
-              key={idx}
-              style={{
-                width: 13,
-                height: 13,
-                borderRadius: '50%',
-                backgroundColor: idx < pin.length ? '#E3EAE5' : 'rgba(255, 255, 255, 0.18)',
-                boxShadow: idx < pin.length ? '0 0 10px rgba(227, 234, 229, 0.8)' : 'none',
-                transform: idx < pin.length ? 'scale(1.2)' : 'scale(1)',
-                transition: 'all 0.15s ease',
-              }}
-            />
-          ))}
+          {[0, 1, 2, 3].map((idx) => {
+            const isFilled = idx < pin.length;
+            return (
+              <div
+                key={idx}
+                style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: '50%',
+                  background: isFilled
+                    ? 'linear-gradient(135deg, #FF95A5 0%, #FF6584 100%)'
+                    : '#FFFFFF',
+                  border: isFilled ? 'none' : '1.5px solid #D1D5DB',
+                  boxShadow: isFilled
+                    ? '0 0 12px rgba(255, 149, 165, 0.95), 0 2px 4px rgba(255, 101, 132, 0.4)'
+                    : 'none',
+                  transform: isFilled ? 'scale(1.25)' : 'scale(1)',
+                  transition: 'all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+              />
+            );
+          })}
         </div>
 
         {/* Keypad */}
@@ -280,14 +358,24 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
               type="button"
               onClick={() => handleDigit(d)}
               style={{
-                height: 48,
-                fontSize: 20,
-                fontWeight: 600,
-                borderRadius: 10,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255, 255, 255, 0.08)',
-                color: '#FFFFFF',
+                height: 50,
+                fontSize: 22,
+                fontWeight: 700,
+                borderRadius: 12,
+                border: '1.5px solid #EAE5DC',
+                backgroundColor: '#FFFFFF',
+                color: '#111827',
                 cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#FFF8F9';
+                e.currentTarget.style.borderColor = '#FF95A5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                e.currentTarget.style.borderColor = '#EAE5DC';
               }}
             >
               {d}
@@ -297,14 +385,21 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
             type="button"
             onClick={handleClear}
             style={{
-              height: 48,
-              fontSize: 13,
-              fontWeight: 600,
-              borderRadius: 10,
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              background: 'rgba(239, 68, 68, 0.15)',
-              color: '#F87171',
+              height: 50,
+              fontSize: 13.5,
+              fontWeight: 700,
+              borderRadius: 12,
+              border: '1.5px solid #FECDD3',
+              backgroundColor: '#FFFFFF',
+              color: '#BE123C',
               cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFF1F2';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
             }}
           >
             مسح
@@ -313,14 +408,24 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
             type="button"
             onClick={() => handleDigit('0')}
             style={{
-              height: 48,
-              fontSize: 20,
-              fontWeight: 600,
-              borderRadius: 10,
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: '#FFFFFF',
+              height: 50,
+              fontSize: 22,
+              fontWeight: 700,
+              borderRadius: 12,
+              border: '1.5px solid #EAE5DC',
+              backgroundColor: '#FFFFFF',
+              color: '#111827',
               cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFDF5';
+              e.currentTarget.style.borderColor = '#FF95A5';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
+              e.currentTarget.style.borderColor = '#EAE5DC';
             }}
           >
             0
@@ -329,37 +434,57 @@ export function LockScreen({ currentUser, onUnlock, onSwitchUser }: LockScreenPr
             type="button"
             onClick={handleBackspace}
             style={{
-              height: 48,
-              fontSize: 18,
-              fontWeight: 600,
-              borderRadius: 10,
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: '#FFFFFF',
+              height: 50,
+              fontSize: 19,
+              fontWeight: 700,
+              borderRadius: 12,
+              border: '1.5px solid #EAE5DC',
+              backgroundColor: '#FFFFFF',
+              color: '#111827',
               cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFDF5';
+              e.currentTarget.style.borderColor = '#FF95A5';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
+              e.currentTarget.style.borderColor = '#EAE5DC';
             }}
           >
-            ⌫
+            <Delete size={20} color="#6B7280" />
           </button>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={handleUnlock}
-          disabled={isVerifying || pin.length < 4}
-          isLoading={isVerifying}
+        <button
+          type="button"
+          onClick={() => handleUnlock()}
+          disabled={isVerifying || pin.length !== 4}
           style={{
             width: '100%',
-            height: 46,
-            background: 'linear-gradient(135deg, #4F6B5E 0%, #355245 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            fontSize: 15,
-            fontWeight: 600,
+            height: 50,
+            borderRadius: 14,
+            border: 'none',
+            background:
+              pin.length === 4
+                ? 'linear-gradient(135deg, #FF95A5 0%, #FF6B8B 100%)'
+                : '#F3F4F6',
+            color: pin.length === 4 ? '#FFFFFF' : '#9CA3AF',
+            cursor: pin.length === 4 && !isVerifying ? 'pointer' : 'not-allowed',
+            boxShadow:
+              pin.length === 4
+                ? '0 8px 24px -4px rgba(255, 107, 139, 0.5), 0 2px 6px rgba(0, 0, 0, 0.06)'
+                : 'none',
+            fontSize: 15.5,
+            fontWeight: 700,
             marginTop: 4,
+            transition: 'all 0.2s ease',
           }}
         >
-          فتح الشاشة 🔓
-        </Button>
+          {isVerifying ? 'جاري التحقق...' : 'فتح الشاشة'}
+        </button>
       </div>
     </div>
   );

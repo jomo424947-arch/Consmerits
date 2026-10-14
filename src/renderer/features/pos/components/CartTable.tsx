@@ -1,8 +1,8 @@
 import React from 'react';
-import { Plus, Minus, Trash2, ShoppingBag, Sparkles } from 'lucide-react';
 import { CartLineItem } from '../types';
 import { formatMoney } from '../../../../shared/utils/money';
 import { GlassIcon } from '../../../components/common/GlassIcon';
+import { AppIcon } from '../../../components/common/AppIcon';
 import { EmptyState } from '../../../components/common/EmptyState';
 
 interface CartTableProps {
@@ -10,6 +10,9 @@ interface CartTableProps {
   onRemove: (id: string) => void;
   onUpdateQty?: (id: string, qty: number) => void;
   lastScannedId?: string;
+  compact?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 export function CartTable({
@@ -17,15 +20,26 @@ export function CartTable({
   onRemove,
   onUpdateQty,
   lastScannedId,
+  compact = false,
+  emptyTitle,
+  emptyDescription,
 }: CartTableProps): React.ReactElement {
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={ShoppingBag}
+        icon="shopping_bag"
         variant="brand"
-        title="سلة البيع فارغة حالياً"
-        description="قم بتوجيه قارئ الباركود نحو المنتج، أو أدخل كود المنتج في حقل البحث أعلاه لإضافته إلى الفاتورة"
-        style={{ margin: '40px auto', border: 'none', background: 'transparent' }}
+        title={emptyTitle || "سلة البيع فارغة حالياً"}
+        description={
+          emptyDescription ||
+          "قم بتوجيه قارئ الباركود نحو المنتج، أو أدخل كود المنتج في حقل البحث أعلاه لإضافته إلى الفاتورة"
+        }
+        style={{
+          margin: compact ? '20px auto' : '40px auto',
+          padding: compact ? '24px 16px' : '48px 24px',
+          border: 'none',
+          background: 'transparent',
+        }}
       />
     );
   }
@@ -40,15 +54,15 @@ export function CartTable({
       }}
     >
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-        <thead>
+        <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: '#FAFBF9' }}>
           <tr style={{ background: '#FAFBF9', borderBottom: '1.5px solid var(--border-light)' }}>
-            <th style={{ width: '5%', padding: '12px 14px', textAlign: 'center' }}>#</th>
-            <th style={{ width: '18%', padding: '12px 14px' }}>الباركود</th>
-            <th style={{ width: '32%', padding: '12px 14px' }}>المنتج / الصنف</th>
-            <th style={{ width: '14%', padding: '12px 14px', textAlign: 'left' }}>سعر الوحدة</th>
-            <th style={{ width: '16%', padding: '12px 14px', textAlign: 'center' }}>الكمية</th>
-            <th style={{ width: '15%', padding: '12px 14px', textAlign: 'left' }}>الإجمالي</th>
-            <th style={{ width: '8%', padding: '12px 14px', textAlign: 'center' }}>حذف</th>
+            {!compact && <th style={{ width: '5%', padding: '12px 14px', textAlign: 'center' }}>#</th>}
+            {!compact && <th style={{ width: '18%', padding: '12px 14px' }}>الباركود</th>}
+            <th style={{ width: compact ? '40%' : '32%', padding: compact ? '9px 10px' : '12px 14px' }}>المنتج / الصنف</th>
+            <th style={{ width: compact ? '18%' : '14%', padding: compact ? '9px 8px' : '12px 14px', textAlign: 'left' }}>السعر</th>
+            <th style={{ width: compact ? '22%' : '16%', padding: compact ? '9px 8px' : '12px 14px', textAlign: 'center' }}>الكمية</th>
+            <th style={{ width: compact ? '15%' : '15%', padding: compact ? '9px 8px' : '12px 14px', textAlign: 'left' }}>الإجمالي</th>
+            <th style={{ width: compact ? '5%' : '8%', padding: compact ? '9px 6px' : '12px 14px', textAlign: 'center' }}></th>
           </tr>
         </thead>
         <tbody>
@@ -59,74 +73,83 @@ export function CartTable({
                 key={item.id}
                 style={{
                   borderBottom: '1px solid var(--border-light)',
-                  backgroundColor: isLatest ? 'rgba(227, 234, 229, 0.4)' : '#FFFFFF',
+                  backgroundColor: isLatest ? 'rgba(255, 149, 165, 0.14)' : '#FFFFFF',
                   transition: 'background 0.2s ease',
                 }}
               >
                 {/* تسلسل */}
-                <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                  {items.length - index}
-                </td>
+                {!compact && (
+                  <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                    {items.length - index}
+                  </td>
+                )}
 
                 {/* الباركود */}
-                <td style={{ padding: '12px 14px' }}>
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: 'var(--color-brand-deep)',
-                      backgroundColor: '#F0F3F1',
-                      padding: '3px 7px',
-                      borderRadius: 4,
-                      border: '1px solid #D5DDD8',
-                    }}
-                  >
-                    {item.barcode}
-                  </span>
-                </td>
+                {!compact && (
+                  <td style={{ padding: '12px 14px' }}>
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--color-brand-deep)',
+                        backgroundColor: '#FFF5F7',
+                        padding: '3px 7px',
+                        borderRadius: 4,
+                        border: '1px solid #F5D5DB',
+                      }}
+                    >
+                      {item.barcode}
+                    </span>
+                  </td>
+                )}
 
                 {/* اسم المنتج والصنف */}
-                <td style={{ padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: 14 }}>
+                <td style={{ padding: compact ? '8px 10px' : '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: compact ? 13 : 14 }}>
                       {item.productName}
                     </div>
                     {item.availableStock !== undefined && (
                       <span
                         style={{
-                          fontSize: 11,
-                          backgroundColor: '#EAEFEA',
-                          color: '#21633D',
-                          padding: '2px 6px',
+                          fontSize: 10,
+                          backgroundColor: '#FFF0F3',
+                          color: '#D63B5E',
+                          padding: '1px 5px',
                           borderRadius: 4,
                           fontWeight: 600,
                         }}
                       >
-                        المتاح: {item.availableStock}
+                        {item.availableStock}
                       </span>
                     )}
                   </div>
-                  {item.variantName && (
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {item.variantName}
+                  {(item.variantName || (compact && item.barcode)) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {item.variantName && <span>{item.variantName}</span>}
+                      {compact && item.barcode && (
+                        <span style={{ fontFamily: 'monospace', fontSize: 10, opacity: 0.8 }}>
+                          {item.barcode}
+                        </span>
+                      )}
                     </div>
                   )}
                 </td>
 
                 {/* سعر الوحدة */}
-                <td style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 600, fontSize: 14 }}>
+                <td style={{ padding: compact ? '8px 8px' : '12px 14px', textAlign: 'left', fontWeight: 600, fontSize: compact ? 13 : 14 }}>
                   {formatMoney(item.unitPrice)}
                 </td>
 
                 {/* التحكم بالكمية (+ و -) */}
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: compact ? '8px 6px' : '12px 14px' }}>
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 6,
+                      gap: compact ? 3 : 6,
                     }}
                   >
                     <button
@@ -134,8 +157,8 @@ export function CartTable({
                       onClick={() => onUpdateQty?.(item.id, item.qty - 1)}
                       title="تقليل الكمية"
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: compact ? 24 : 28,
+                        height: compact ? 24 : 28,
                         borderRadius: 6,
                         border: '1px solid #D5DAD6',
                         background: '#FFFFFF',
@@ -146,16 +169,17 @@ export function CartTable({
                         color: 'var(--text-secondary)',
                       }}
                     >
-                      <Minus size={14} />
+                      <AppIcon name="remove" size={compact ? 12 : 14} />
                     </button>
 
                     <span
                       style={{
-                        minWidth: 28,
+                        minWidth: compact ? 20 : 28,
                         textAlign: 'center',
                         fontWeight: 700,
-                        fontSize: 14,
+                        fontSize: compact ? 13 : 14,
                         color: 'var(--color-brand-deep)',
+                        fontFamily: 'Space Grotesk, sans-serif',
                       }}
                     >
                       {item.qty}
@@ -171,8 +195,8 @@ export function CartTable({
                           : 'زيادة الكمية'
                       }
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: compact ? 24 : 28,
+                        height: compact ? 24 : 28,
                         borderRadius: 6,
                         border: '1px solid #D5DAD6',
                         background:
@@ -192,7 +216,7 @@ export function CartTable({
                             : 'var(--text-secondary)',
                       }}
                     >
-                      <Plus size={14} />
+                      <AppIcon name="add" size={compact ? 12 : 14} />
                     </button>
                   </div>
                 </td>
@@ -200,18 +224,19 @@ export function CartTable({
                 {/* الإجمالي */}
                 <td
                   style={{
-                    padding: '12px 14px',
+                    padding: compact ? '8px 8px' : '12px 14px',
                     textAlign: 'left',
                     fontWeight: 700,
-                    fontSize: 15,
+                    fontSize: compact ? 13.5 : 15,
                     color: 'var(--color-brand-deep)',
+                    fontFamily: 'Space Grotesk, sans-serif',
                   }}
                 >
                   {formatMoney(item.total)}
                 </td>
 
                 {/* زر الحذف */}
-                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                <td style={{ padding: compact ? '8px 4px' : '12px 14px', textAlign: 'center' }}>
                   <button
                     type="button"
                     onClick={() => onRemove(item.id)}
@@ -221,7 +246,7 @@ export function CartTable({
                       border: 'none',
                       color: 'var(--color-danger)',
                       cursor: 'pointer',
-                      padding: 6,
+                      padding: compact ? 4 : 6,
                       borderRadius: 6,
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -231,7 +256,7 @@ export function CartTable({
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-danger-bg)')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <Trash2 size={16} />
+                    <AppIcon name="delete" size={compact ? 15 : 16} />
                   </button>
                 </td>
               </tr>

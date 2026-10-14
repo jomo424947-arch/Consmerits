@@ -7,7 +7,7 @@ export const loginWithPasswordSchema = z.object({
 });
 
 export const loginWithPinSchema = z.object({
-  pin: z.string().regex(/^\d{4,6}$/, 'رمز PIN يجب أن يتكون من 4 إلى 6 أرقام'),
+  pin: z.string().regex(/^\d{4}$/, 'رمز PIN يجب أن يتكون من 4 أرقام بالضبط'),
 });
 
 export const createUserSchema = z.object({
@@ -15,7 +15,7 @@ export const createUserSchema = z.object({
   display_name: z.string().min(1, 'الاسم الظاهر مطلوب'),
   role: z.enum([USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER]),
   password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل').optional(),
-  pin: z.string().regex(/^\d{4,6}$/, 'رمز PIN يجب أن يتكون من 4 إلى 6 أرقام').optional().nullable(),
+  pin: z.string().regex(/^\d{4}$/, 'رمز PIN يجب أن يتكون من 4 أرقام بالضبط').optional().nullable(),
 });
 
 export const updateUserSchema = z.object({
@@ -23,7 +23,7 @@ export const updateUserSchema = z.object({
   role: z.enum([USER_ROLES.OWNER, USER_ROLES.MANAGER, USER_ROLES.CASHIER]).optional(),
   is_active: z.number().int().min(0).max(1).optional(),
   password: z.string().min(4, 'كلمة المرور يجب أن تكون 4 أحرف على الأقل').optional(),
-  pin: z.string().regex(/^\d{4,6}$/, 'رمز PIN يجب أن يتكون من 4 إلى 6 أرقام').optional().nullable(),
+  pin: z.string().regex(/^\d{4}$/, 'رمز PIN يجب أن يتكون من 4 أرقام بالضبط').optional().nullable(),
 });
 
 export const changePasswordSchema = z.object({
@@ -33,5 +33,5 @@ export const changePasswordSchema = z.object({
 
 export const overridePinSchema = z.object({
   permission: z.string().min(1, 'الصلاحية مطلوبة'),
-  pin: z.string().regex(/^\d{4,6}$/, 'رمز PIN يجب أن يتكون من 4 إلى 6 أرقام'),
+  pin: z.string().regex(/^\d{4}$/, 'رمز PIN يجب أن يتكون من 4 أرقام بالضبط'),
 });

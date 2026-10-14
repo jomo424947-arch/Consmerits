@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { AlertTriangle, HelpCircle, X } from 'lucide-react';
 import { GlassIcon } from './GlassIcon';
+import { AppIcon } from './AppIcon';
 import { sounds } from '../../lib/sounds';
 
 export interface ConfirmDialogProps {
@@ -68,18 +68,19 @@ export function ConfirmDialog({
           backgroundColor: '#FFFFFF',
           borderRadius: 16,
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.18)',
+          fontFamily: 'var(--font-family)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
           <GlassIcon
-            icon={isDangerous ? AlertTriangle : HelpCircle}
+            icon={isDangerous ? 'warning' : 'help'}
             size="lg"
             variant={isDangerous ? 'danger' : 'gold'}
             glow
           />
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#2F4A3E' }}>{title}</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-brand-deep)' }}>{title}</h3>
           </div>
           <button
             type="button"
@@ -88,15 +89,15 @@ export function ConfirmDialog({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#8A928D',
+              color: 'var(--text-muted)',
               padding: 4,
             }}
           >
-            <X size={20} />
+            <AppIcon name="close" size={20} />
           </button>
         </div>
 
-        <p style={{ fontSize: 14, color: '#4A514D', lineHeight: 1.6, marginBottom: 24 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24 }}>
           {message}
         </p>
 

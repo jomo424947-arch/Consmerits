@@ -159,53 +159,41 @@ export function InvoicesScreen(): React.ReactElement {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={FileText} size="lg" variant="brand" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي الفواتير المسجلة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {sales.length} فاتورة
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي الفواتير المسجلة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {sales.length} فاتورة
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Coins} size="lg" variant="success" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي قيمة الفواتير المعروضة</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#21633D' }}>
-              {formatMoney(totalFilteredAmount)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي قيمة الفواتير المعروضة</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#21633D', marginTop: 4 }}>
+            {formatMoney(totalFilteredAmount)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={CheckCircle2} size="lg" variant="primary" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>فواتير مكتملة وناجحة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {sales.filter((s) => s.status === 'completed').length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>فواتير مكتملة وناجحة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {sales.filter((s) => s.status === 'completed').length}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={XCircle} size="lg" variant="danger" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>فواتير ملغاة (Voided)</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34' }}>
-              {sales.filter((s) => s.status === 'voided').length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>فواتير ملغاة (Voided)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34', marginTop: 4 }}>
+            {sales.filter((s) => s.status === 'voided').length}
           </div>
         </div>
       </div>
@@ -356,7 +344,7 @@ export function InvoicesScreen(): React.ReactElement {
                         {isVoided ? (
                           <span className="badge badge-danger">ملغاة</span>
                         ) : (
-                          <span className="badge badge-success">مكتملة ✓</span>
+                          <span className="badge badge-success">مكتملة</span>
                         )}
                       </td>
 

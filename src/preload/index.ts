@@ -30,6 +30,16 @@ const electronAPI = {
   changePassword: (data: { oldPass: string; newPass: string }) =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTH_CHANGE_PASSWORD, data),
   resetPin: (pin: string) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_RESET_PIN, { pin }),
+  checkSetupStatus: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_CHECK_SETUP_STATUS),
+  completeInitialSetup: (data: {
+    storeName: string;
+    storePhone?: string;
+    storeAddress?: string;
+    username: string;
+    displayName: string;
+    password: string;
+    pin: string;
+  }) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_COMPLETE_INITIAL_SETUP, data),
   requestOverride: (permission: Permission, pin: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OVERRIDE_PIN, { permission, pin }),
 

@@ -1,24 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import {
-  ShoppingCart,
-  Receipt,
-  Tag,
-  Package,
-  Truck,
-  RotateCcw,
-  Coins,
-  BarChart3,
-  Settings,
-  Sparkles,
-  Lock,
-  LogOut,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
 import type { NavTab } from '../../App';
 import { ROLE_LABELS } from '../../../shared/constants/roles';
 import { SafeUser } from '../../../shared/types/users.types';
 import { GlassIcon, GlassIconVariant } from '../common/GlassIcon';
+import { AppIcon } from '../common/AppIcon';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { sounds } from '../../lib/sounds';
 
@@ -32,21 +17,20 @@ interface SidebarProps {
 interface NavItemDef {
   id: NavTab;
   label: string;
-  icon: typeof ShoppingCart;
+  icon: string;
   variant: GlassIconVariant;
-  hotkey: string;
 }
 
 const navItems: NavItemDef[] = [
-  { id: 'pos', label: 'شاشة البيع (POS)', icon: ShoppingCart, variant: 'brand', hotkey: 'F1' },
-  { id: 'invoices', label: 'سجل الفواتير', icon: Receipt, variant: 'info', hotkey: 'F2' },
-  { id: 'products', label: 'المنتجات والباركود', icon: Tag, variant: 'primary', hotkey: 'F3' },
-  { id: 'inventory', label: 'المخزون والصلاحية', icon: Package, variant: 'gold', hotkey: 'F4' },
-  { id: 'purchases', label: 'المشتريات والموردين', icon: Truck, variant: 'info', hotkey: 'F5' },
-  { id: 'returns', label: 'المرتجعات والبدائل', icon: RotateCcw, variant: 'danger', hotkey: 'F6' },
-  { id: 'cash', label: 'الخزنة والورديات', icon: Coins, variant: 'gold', hotkey: 'F7' },
-  { id: 'reports', label: 'التقارير والإحصائيات', icon: BarChart3, variant: 'brand', hotkey: 'F8' },
-  { id: 'settings', label: 'الإعدادات والمستخدمين', icon: Settings, variant: 'neutral', hotkey: 'F9' },
+  { id: 'pos', label: 'شاشة البيع (POS)', icon: 'point_of_sale', variant: 'brand' },
+  { id: 'invoices', label: 'سجل الفواتير', icon: 'receipt_long', variant: 'brand' },
+  { id: 'products', label: 'المنتجات والباركود', icon: 'sell', variant: 'brand' },
+  { id: 'inventory', label: 'المخزون والصلاحية', icon: 'inventory_2', variant: 'brand' },
+  { id: 'purchases', label: 'المشتريات والموردين', icon: 'local_shipping', variant: 'brand' },
+  { id: 'returns', label: 'المرتجعات والبدائل', icon: 'assignment_return', variant: 'brand' },
+  { id: 'cash', label: 'الخزنة والورديات', icon: 'payments', variant: 'brand' },
+  { id: 'reports', label: 'التقارير والإحصائيات', icon: 'query_stats', variant: 'brand' },
+  { id: 'settings', label: 'الإعدادات والمستخدمين', icon: 'settings', variant: 'brand' },
 ];
 
 export function Sidebar({
@@ -116,7 +100,7 @@ export function Sidebar({
       <aside
         className="glass-sidebar"
         style={{
-          width: 250,
+          width: 270,
           backgroundColor: '#FFFFFF',
           borderLeft: '1px solid var(--border-light)',
           display: 'flex',
@@ -137,15 +121,16 @@ export function Sidebar({
             background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAF9 100%)',
           }}
         >
-          <GlassIcon icon={Sparkles} size="lg" variant="rose" glow />
+          <GlassIcon icon="auto_awesome" size="lg" variant="rose" glow />
           <div>
             <h2
               style={{
-                fontSize: 17,
+                fontSize: 16.5,
                 fontWeight: 700,
                 color: 'var(--color-brand-deep)',
                 margin: 0,
-                lineHeight: 1.2,
+                lineHeight: 1.25,
+                fontFamily: 'var(--font-family)',
               }}
             >
               كوزمتكس ستور
@@ -155,6 +140,8 @@ export function Sidebar({
                 fontSize: 11,
                 color: 'var(--text-muted)',
                 fontWeight: 500,
+                display: 'block',
+                marginTop: 2,
               }}
             >
               نظام نقاط البيع وإدارة التجميل
@@ -184,23 +171,29 @@ export function Sidebar({
                   alignItems: 'center',
                   gap: 12,
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '10px 14px',
                   borderRadius: 10,
-                  border: isActive
-                    ? '1px solid rgba(79, 107, 94, 0.25)'
-                    : '1px solid transparent',
-                  backgroundColor: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  color: isActive ? 'var(--color-brand-deep)' : 'var(--text-secondary)',
-                  fontWeight: isActive ? 600 : 500,
+                  borderRight: isActive
+                    ? '3px solid #FF95A5'
+                    : '3px solid transparent',
+                  borderTop: '1px solid transparent',
+                  borderBottom: '1px solid transparent',
+                  borderLeft: '1px solid transparent',
+                  background: isActive
+                    ? 'linear-gradient(to left, rgba(255, 149, 165, 0.16) 0%, rgba(255, 149, 165, 0.02) 100%)'
+                    : 'transparent',
+                  color: isActive ? '#D63B5E' : 'var(--text-secondary)',
+                  fontWeight: isActive ? 700 : 500,
                   fontSize: 14,
                   cursor: 'pointer',
                   textAlign: 'right',
                   transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
                   position: 'relative',
+                  fontFamily: 'var(--font-family)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = '#F4F6F4';
+                    e.currentTarget.style.backgroundColor = '#FFF8F9';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -215,16 +208,8 @@ export function Sidebar({
                   variant={item.variant}
                   active={isActive}
                 />
-                <span style={{ flex: 1 }}>{item.label}</span>
-                <span
-                  className="kbd-badge"
-                  style={{
-                    backgroundColor: isActive ? '#FFFFFF' : 'rgba(0, 0, 0, 0.05)',
-                    color: isActive ? 'var(--color-brand-deep)' : 'var(--text-muted)',
-                    borderColor: isActive ? 'rgba(79, 107, 94, 0.3)' : 'transparent',
-                  }}
-                >
-                  {item.hotkey}
+                <span style={{ flex: 1, whiteSpace: 'nowrap' }}>
+                  {item.label}
                 </span>
               </button>
             );
@@ -242,7 +227,9 @@ export function Sidebar({
             backgroundColor: '#FAFAF9',
           }}
         >
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>المؤثرات الصوتية</span>
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 500 }}>
+            المؤثرات الصوتية
+          </span>
           <button
             type="button"
             onClick={handleToggleMute}
@@ -259,9 +246,10 @@ export function Sidebar({
               borderRadius: 6,
               fontSize: 12,
               fontWeight: 600,
+              fontFamily: 'var(--font-family)',
             }}
           >
-            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            <AppIcon name={isMuted ? 'volume_off' : 'volume_up'} size={17} />
             <span>{isMuted ? 'صامت' : 'مفعل'}</span>
           </button>
         </div>
@@ -287,11 +275,12 @@ export function Sidebar({
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',
+                  fontFamily: 'var(--font-family)',
                 }}
               >
                 {currentUser?.display_name || 'كاشير المحل'}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
                 {currentUser ? ROLE_LABELS[currentUser.role] : 'مستخدم نشط'}
               </div>
             </div>
@@ -316,7 +305,7 @@ export function Sidebar({
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#EAEFEA')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
               >
-                <Lock size={15} />
+                <AppIcon name="lock" size={17} />
               </button>
 
               <button
@@ -338,7 +327,7 @@ export function Sidebar({
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FBEAEB')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
               >
-                <LogOut size={15} />
+                <AppIcon name="logout" size={17} />
               </button>
             </div>
           </div>

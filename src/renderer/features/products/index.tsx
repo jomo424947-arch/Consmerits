@@ -27,80 +27,45 @@ export function ProductsScreen(): React.ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, height: '100%' }}>
       {/* بطاقات الإحصائيات العلوية */}
+      {/* بطاقات الإحصائيات العلوية */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Tag} size="lg" variant="primary" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المنتجات</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {products.length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المنتجات</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {products.length}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Package} size="lg" variant="brand" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المخزون بالقطع</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {totalStockCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المخزون بالقطع</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {totalStockCount}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={AlertTriangle} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>أصناف منخفضة الرصيد</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: lowStockCount > 0 ? '#962B34' : 'var(--color-brand-deep)' }}>
-              {lowStockCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>أصناف منخفضة الرصيد</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: lowStockCount > 0 ? '#962B34' : 'var(--color-brand-deep)', marginTop: 4 }}>
+            {lowStockCount}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Layers} size="lg" variant="rose" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>الأقسام والتصنيفات</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {categoriesCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>الأقسام والتصنيفات</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {categoriesCount}
           </div>
         </div>
       </div>

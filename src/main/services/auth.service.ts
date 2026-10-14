@@ -315,9 +315,12 @@ export class AuthService {
       throw new Error(`اسم المستخدم "${input.username}" مستخدم بالفعل`);
     }
 
-    // التحقق من الصلاحيات الإدارية: يُسمح فقط للحسابات المعتمدة برتبة المالك
-    if (input.role === USER_ROLES.OWNER && !isAllowedAdminUsername(input.username)) {
-      throw new Error('غير مصرح بتعيين هذا الحساب كمدير/مالك. الحسابات الإدارية المعتمدة محددة مسبقاً فقط.');
+    // التحقق من الصلاحيات الإدارية لتعيين المالك
+    if (input.role === USER_ROLES.OWNER) {
+      const activeOwners = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'owner' AND is_active = 1").get() as { count: number };
+      if (activeOwners.count > 0 && !actorUserId) {
+        throw new Error('غير مصرح بإنشاء حساب مالك جديد دون تفويض من المالك الحالي.');
+      }
     }
 
     const uuid = crypto.randomUUID();
@@ -613,6 +616,111 @@ export class AuthService {
     }
 
     return seededAny ? primaryOwner : null;
+  }
+
+  /**
+   * فحص هل تم إعداد وتهيئة النظام مسبقاً (وجود حساب مالك نشط)
+   */
+  isSetupCompleted(): boolean {
+    const db = this.getDb();
+    const owner = db
+      .prepare(
+        "SELECT id FROM users WHERE role = 'owner' AND is_active = 1 AND username NOT IN ('mohamed_joker', 'test_admin') LIMIT 1"
+      )
+      .get();
+    return !!owner;
+  }
+
+  /**
+   * إتمام التهيئة الأولية للمتجر وإنشاء حساب المالك الأول
+   */
+  async completeInitialSetup(data: {
+    storeName: string;
+    storePhone?: string;
+    storeAddress?: string;
+    username: string;
+    displayName: string;
+    password: string;
+    pin: string;
+  }): Promise<{ success: boolean; user?: SafeUser; error?: string }> {
+    const db = this.getDb();
+
+    // منع إعادة التهيئة إذا كان المالك موجوداً بالفعل
+    if (this.isSetupCompleted()) {
+      return { success: false, error: 'تم إعداد النظام مسبقاً بالفعل، لا يمكن إعادة التهيئة الأولية.' };
+    }
+
+    if (!data.username || data.username.trim().length < 3) {
+      return { success: false, error: 'اسم المستخدم يجب أن يتكون من 3 أحرف على الأقل' };
+    }
+
+    if (!data.password || data.password.length < 6) {
+      return { success: false, error: 'كلمة المرور يجب أن تتكون من 6 أحرف على الأقل' };
+    }
+
+    if (!data.pin || !/^\d{4}$/.test(data.pin.trim())) {
+      return { success: false, error: 'رمز الـ PIN يجب أن يتكون من 4 أرقام بالضبط' };
+    }
+
+    if (!data.storeName || data.storeName.trim().length < 2) {
+      return { success: false, error: 'اسم المتجر مطلوب ويجب أن يتكون من حرفين على الأقل' };
+    }
+
+    // تنظيف أي حسابات تجريبية أو وهمية متبقية إن وُجدت
+    try {
+      db.prepare("DELETE FROM users WHERE username IN ('mohamed_joker', 'test_admin', 'admin')").run();
+    } catch {
+      // ignore
+    }
+
+    const uuid = crypto.randomUUID();
+    const password_hash = hashPassword(data.password);
+    const pin_hash = hashPin(data.pin.trim());
+    const displayName = data.displayName?.trim() || data.username.trim();
+
+    const stmt = db.prepare(`
+      INSERT INTO users (uuid, username, display_name, password_hash, pin_hash, role, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, 'owner', 1, datetime('now'))
+    `);
+
+    const result = stmt.run(
+      uuid,
+      data.username.trim(),
+      displayName,
+      password_hash,
+      pin_hash
+    );
+
+    const insertedId = Number(result.lastInsertRowid);
+
+    // تحديث إعدادات المتجر
+    try {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_name', ?, datetime('now'))").run(data.storeName.trim());
+      if (data.storePhone?.trim()) {
+        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_phone', ?, datetime('now'))").run(data.storePhone.trim());
+      }
+      if (data.storeAddress?.trim()) {
+        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_address', ?, datetime('now'))").run(data.storeAddress.trim());
+      }
+      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('system_initialized', '1', datetime('now'))").run();
+    } catch (err) {
+      console.error('فشل حفظ إعدادات المتجر أثناء التهيئة:', err);
+    }
+
+    // تسجيل في سجل التدقيق
+    this.auditService.log({
+      userId: insertedId,
+      action: 'SYSTEM_INITIALIZED',
+      entityType: 'users',
+      entityId: insertedId,
+      details: { username: data.username.trim(), store: data.storeName.trim() },
+    });
+
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(insertedId) as User;
+    const safeUser = this.toSafeUser(user);
+    this.sessionService.setCurrentUser(safeUser);
+
+    return { success: true, user: safeUser };
   }
 }
 

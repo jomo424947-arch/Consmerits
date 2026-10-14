@@ -1,24 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  CreditCard,
-  PauseCircle,
-  PlayCircle,
-  Trash2,
-  Percent,
-  User,
-  ShoppingBag,
-  Sparkles,
-} from 'lucide-react';
-import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { GlassIcon } from '../../components/common/GlassIcon';
+import { AppIcon } from '../../components/common/AppIcon';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { useToast } from '../../components/common/ToastContext';
 import { BarcodeInput } from './components/BarcodeInput';
 import { CartTable } from './components/CartTable';
+import { ProductCatalog } from './components/ProductCatalog';
 import { PaymentModal } from './components/PaymentModal';
 import { HeldSalesModal } from './components/HeldSalesModal';
-import { HotkeysBar } from './components/HotkeysBar';
 import { usePos } from './hooks/usePos';
 import { formatMoney } from '../../../shared/utils/money';
 import { sounds } from '../../lib/sounds';
@@ -38,6 +28,7 @@ export function PosScreen(): React.ReactElement {
     setDiscountAmount,
     setCustomerName,
     addItemByBarcode,
+    addProductToCart,
     updateQuantity,
     removeItem,
     clearCart,
@@ -90,6 +81,13 @@ export function PosScreen(): React.ReactElement {
     }
   };
 
+  const handleSelectCatalogProduct = (product: any, variant?: any) => {
+    const res = addProductToCart(product, variant);
+    if (!res.success && res.message) {
+      toastError(res.message);
+    }
+  };
+
   const handleHoldSale = async () => {
     if (cart.length === 0) {
       toastWarning(MESSAGES.CART_EMPTY);
@@ -126,56 +124,61 @@ export function PosScreen(): React.ReactElement {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 360px',
-        gap: 20,
+        gridTemplateColumns: 'minmax(0, 1fr) 420px',
+        gap: 16,
         height: '100%',
         boxSizing: 'border-box',
       }}
     >
-      {/* القسم الرئيسي الأيمن: الباركود وشريط الاختصارات وجدول المنتجات */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, height: '100%' }}>
-        {/* شريط الإدخال السريع */}
+      {/* القسم الرئيسي الأيمن: الباركود وشريط الاختصارات وكتالوج المنتجات المتسع بالكامل */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minWidth: 0,
+          height: '100%',
+          overflow: 'hidden',
+        }}
+      >
+        {/* شريط الإدخال السريع للباركود */}
         <BarcodeInput onScan={handleScan} isLoading={isLoading} />
 
-        {/* شريط الاختصارات المفتاحية السريعة */}
-        <HotkeysBar />
-
-        {/* جدول سلة المبيعات الزجاجي */}
-        <div
-          className="glass-card"
-          style={{
-            flex: 1,
-            padding: 0,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <CartTable
-            items={cart}
-            onRemove={removeItem}
-            onUpdateQty={updateQuantity}
-            lastScannedId={lastScannedItem?.id}
+        {/* كتالوج المنتجات المتسع والكامل بكامل المساحة */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <ProductCatalog
+            onSelectProduct={handleSelectCatalogProduct}
+            style={{ height: '100%', minWidth: 0 }}
           />
         </div>
       </div>
 
-      {/* القسم الجانبي الأيسر: ملخص الفاتورة وإتمام الدفع والإجراءات */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+      {/* القسم الجانبي الأيسر: العميل، سلة المبيعات الحالية، ملخص الإجمالي، وأزرار الدفع والإجراءات */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          height: '100%',
+          minWidth: 0,
+          overflow: 'hidden',
+        }}
+      >
         {/* بطاقة العميل الحالي */}
         <div
           className="glass-card"
           style={{
-            padding: '14px 16px',
+            padding: '10px 14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             backgroundColor: '#FFFFFF',
+            borderRadius: 12,
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GlassIcon icon={User} size="xs" variant="primary" />
+            <GlassIcon icon="person" size="xs" variant="primary" />
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand-deep)' }}>
                 {customerName || 'عميل نقدي سريع'}
@@ -185,114 +188,178 @@ export function PosScreen(): React.ReactElement {
           </div>
         </div>
 
-        {/* بطاقة إجمالي الفاتورة الفاخرة */}
+        {/* كارد سلة المبيعات الحالية (تم نقلها هنا لتوسيع كتالوج المنتجات) */}
         <div
           className="glass-card"
           style={{
-            padding: '24px 20px',
-            textAlign: 'center',
-            background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAF8 100%)',
-            border: '1.5px solid rgba(79, 107, 94, 0.25)',
-            boxShadow: '0 8px 24px rgba(47, 74, 62, 0.08)',
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            overflow: 'hidden',
+            border: '1px solid var(--border-light)',
+            padding: 0,
           }}
         >
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>
-            إجمالي الفاتورة النهائي
-          </div>
-
-          <div
-            style={{
-              fontSize: 34,
-              fontWeight: 800,
-              color: 'var(--color-brand-deep)',
-              margin: '10px 0 6px',
-              letterSpacing: '-0.5px',
-            }}
-          >
-            {formatMoney(total)}
-          </div>
-
+          {/* شريط ترويسة السلة */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 14,
-              fontSize: 12,
-              color: 'var(--text-secondary)',
-              marginTop: 8,
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              backgroundColor: '#F8FAF9',
+              borderBottom: '1.5px solid var(--border-light)',
+              flexShrink: 0,
             }}
           >
-            <span>عدد الأصناف: <strong>{cart.length}</strong></span>
-            <span>•</span>
-            <span>إجمالي القطع: <strong>{totalItemCount}</strong></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AppIcon name="shopping_cart" size={17} color="var(--color-primary)" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-brand-deep)' }}>
+                سلة المبيعات الحالية
+              </span>
+              <span
+                className="kbd-badge"
+                style={{
+                  backgroundColor: '#FFF0F3',
+                  color: '#D63B5E',
+                  padding: '1px 7px',
+                  fontFamily: 'Space Grotesk, sans-serif',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderColor: 'rgba(255, 149, 165, 0.35)',
+                }}
+              >
+                {cart.length} صنف
+              </span>
+            </div>
+
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playWarning();
+                  setShowClearConfirm(true);
+                }}
+                title="مسح وتفريغ السلة"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-danger)',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-danger-bg)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <AppIcon name="delete_sweep" size={14} />
+                <span>تفريغ السلة</span>
+              </button>
+            )}
           </div>
 
-          {/* تفاصيل الخصم إن وجد */}
-          {discountAmount > 0 && (
-            <div
-              style={{
-                marginTop: 10,
-                fontSize: 12,
-                color: 'var(--color-danger)',
-                fontWeight: 600,
-                backgroundColor: 'var(--color-danger-bg)',
-                padding: '4px 10px',
-                borderRadius: 6,
-                display: 'inline-block',
-              }}
-            >
-              خصم إضافي: {formatMoney(discountAmount)}-
-            </div>
-          )}
+          {/* محتوى جدول السلة القابل للتمرير بوضع compact */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            <CartTable
+              items={cart}
+              onRemove={removeItem}
+              onUpdateQty={updateQuantity}
+              lastScannedId={lastScannedItem?.id}
+              compact={true}
+              emptyTitle="سلة البيع فارغة"
+              emptyDescription="انقر على أي منتج من الكتالوج لإضافته، أو وجّه قارئ الباركود"
+            />
+          </div>
         </div>
 
-        {/* أزرار الإجراءات الرئيسية */}
+        {/* بطاقة ملخص الإجمالي وأزرار السداد والإجراءات */}
         <div
           className="glass-card"
           style={{
-            padding: 16,
+            padding: '14px 16px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            border: '1.5px solid rgba(255, 149, 165, 0.28)',
+            boxShadow: '0 6px 22px rgba(255, 149, 165, 0.09)',
+            flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
-            backgroundColor: '#FFFFFF',
           }}
         >
-          {/* زر الدفع الرئيسي الكبير */}
-          <Button
-            variant="success"
+          {/* ملخص الإجمالي */}
+          <div
             style={{
-              height: 52,
-              fontSize: 17,
-              fontWeight: 700,
-              boxShadow: '0 4px 14px rgba(33, 99, 61, 0.3)',
-            }}
-            kbdShortcut="F4"
-            disabled={cart.length === 0}
-            onClick={() => {
-              sounds.playClick();
-              setIsPaymentOpen(true);
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingBottom: 8,
+              borderBottom: '1px solid var(--border-light)',
             }}
           >
-            <CreditCard size={20} />
-            <span>إتمام الدفع والسداد</span>
-          </Button>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                إجمالي الفاتورة النهائي
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 11.5,
+                  color: 'var(--text-secondary)',
+                  marginTop: 3,
+                }}
+              >
+                <span>عدد الأصناف: <strong>{cart.length}</strong></span>
+                <span>•</span>
+                <span>إجمالي القطع: <strong>{totalItemCount}</strong></span>
+              </div>
+            </div>
 
-          {/* إضافة خصم */}
-          {!showDiscountInput ? (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                sounds.playClick();
-                setShowDiscountInput(true);
-              }}
-              style={{ height: 42, fontSize: 13 }}
-            >
-              <Percent size={15} />
-              <span>إضافة خصم على الفاتورة</span>
-            </button>
-          ) : (
+            <div style={{ textAlign: 'left' }}>
+              <div
+                className="num-stat font-display"
+                style={{
+                  fontSize: 28,
+                  fontWeight: 800,
+                  color: 'var(--color-brand-deep)',
+                  lineHeight: 1.1,
+                  letterSpacing: '-0.5px',
+                }}
+              >
+                {formatMoney(total)}
+              </div>
+              {discountAmount > 0 && (
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 11,
+                    color: 'var(--color-danger)',
+                    fontWeight: 600,
+                    backgroundColor: 'var(--color-danger-bg)',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    display: 'inline-block',
+                  }}
+                >
+                  خصم: {formatMoney(discountAmount)}-
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* حقل إدخال الخصم إن كان مفعلاً */}
+          {showDiscountInput && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input
                 type="number"
@@ -300,14 +367,14 @@ export function PosScreen(): React.ReactElement {
                 value={customDiscountStr}
                 onChange={(e) => setCustomDiscountStr(e.target.value)}
                 className="in"
-                style={{ height: 38, fontSize: 13 }}
+                style={{ height: 36, fontSize: 13 }}
                 autoFocus
               />
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={handleApplyDiscount}
-                style={{ height: 38, padding: '0 12px', fontSize: 13 }}
+                style={{ height: 36, padding: '0 12px', fontSize: 12.5 }}
               >
                 تطبيق
               </button>
@@ -315,56 +382,90 @@ export function PosScreen(): React.ReactElement {
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setShowDiscountInput(false)}
-                style={{ height: 38, padding: '0 10px', fontSize: 13 }}
+                style={{ height: 36, padding: '0 10px', fontSize: 12.5 }}
               >
                 إلغاء
               </button>
             </div>
           )}
 
-          {/* تعليق الفاتورة */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleHoldSale}
+          {/* زر إتمام الدفع والسداد الرئيسي (بتدرج الروز الفاخر المطابق لصفحة الدخول) */}
+          <Button
+            variant="primary"
+            style={{
+              height: 48,
+              fontSize: 15.5,
+              fontWeight: 700,
+              boxShadow: '0 4px 16px rgba(255, 149, 165, 0.4)',
+              gap: 10,
+            }}
             disabled={cart.length === 0}
-            style={{ height: 42, fontSize: 13 }}
-          >
-            <PauseCircle size={16} />
-            <span>تعليق الفاتورة الحالية</span>
-            <span className="kbd-badge kbd-badge-dark">F6</span>
-          </button>
-
-          {/* استرجاع معلق */}
-          <button
-            type="button"
-            className="btn btn-secondary"
             onClick={() => {
               sounds.playClick();
-              setIsHeldModalOpen(true);
+              setIsPaymentOpen(true);
             }}
-            style={{ height: 42, fontSize: 13 }}
           >
-            <PlayCircle size={16} />
-            <span>الفواتير المعلقة</span>
-            <span className="kbd-badge kbd-badge-dark">F7</span>
-          </button>
+            <AppIcon name="credit_card" size={20} />
+            <span>إتمام الدفع والسداد</span>
+          </Button>
 
-          {/* إلغاء الفاتورة بالكامل */}
-          <button
-            type="button"
-            className="btn btn-danger-outline"
-            onClick={() => {
-              sounds.playWarning();
-              setShowClearConfirm(true);
-            }}
-            disabled={cart.length === 0}
-            style={{ height: 42, fontSize: 13, marginTop: 4 }}
-          >
-            <Trash2 size={16} />
-            <span>إلغاء ومسح الفاتورة</span>
-            <span className="kbd-badge" style={{ borderColor: '#F5C6CB', color: 'var(--color-danger)' }}>Esc</span>
-          </button>
+          {/* أزرار الإجراءات الثانوية بشبكة 2x2 منظمة وسريعة */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+            {/* إضافة خصم */}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                sounds.playClick();
+                setShowDiscountInput(!showDiscountInput);
+              }}
+              style={{ height: 36, fontSize: 12, gap: 6, padding: '0 8px', justifyContent: 'center' }}
+            >
+              <AppIcon name="percent" size={15} color="var(--color-primary)" />
+              <span>إضافة خصم</span>
+            </button>
+
+            {/* تعليق الفاتورة */}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleHoldSale}
+              disabled={cart.length === 0}
+              style={{ height: 36, fontSize: 12, gap: 6, padding: '0 8px', justifyContent: 'center' }}
+            >
+              <AppIcon name="pause_circle" size={15} color="var(--color-primary)" />
+              <span>تعليق</span>
+            </button>
+
+            {/* الفواتير المعلقة */}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                sounds.playClick();
+                setIsHeldModalOpen(true);
+              }}
+              style={{ height: 36, fontSize: 12, gap: 6, padding: '0 8px', justifyContent: 'center' }}
+            >
+              <AppIcon name="pending_actions" size={15} color="var(--color-gold)" />
+              <span>معلقة</span>
+            </button>
+
+            {/* إلغاء ومسح */}
+            <button
+              type="button"
+              className="btn btn-danger-outline"
+              onClick={() => {
+                sounds.playWarning();
+                setShowClearConfirm(true);
+              }}
+              disabled={cart.length === 0}
+              style={{ height: 36, fontSize: 12, gap: 6, padding: '0 8px', justifyContent: 'center' }}
+            >
+              <AppIcon name="delete_sweep" size={15} color="var(--color-danger)" />
+              <span>إلغاء</span>
+            </button>
+          </div>
         </div>
       </div>
 

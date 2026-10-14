@@ -135,4 +135,24 @@ export function registerAuthIpcHandlers(): void {
       }
     }
   );
+
+  // فحص هل تم إعداد وتهيئة النظام مسبقاً
+  ipcMain.handle(IPC_CHANNELS.AUTH_CHECK_SETUP_STATUS, async () => {
+    try {
+      const isSetupCompleted = authService.isSetupCompleted();
+      return { success: true, isSetupCompleted };
+    } catch (err: any) {
+      return { success: false, error: err.message, isSetupCompleted: false };
+    }
+  });
+
+  // إتمام التهيئة الأولية للمتجر وإنشاء حساب المالك الأول
+  ipcMain.handle(IPC_CHANNELS.AUTH_COMPLETE_INITIAL_SETUP, async (_event, data: any) => {
+    try {
+      const result = await authService.completeInitialSetup(data);
+      return result;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
 }

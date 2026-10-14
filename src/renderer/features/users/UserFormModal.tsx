@@ -64,8 +64,8 @@ export function UserFormModal({
       return;
     }
 
-    if (pin && !/^\d{4,6}$/.test(pin.trim())) {
-      setError('رمز PIN يجب أن يتكون من 4 إلى 6 أرقام');
+    if (pin && !/^\d{4}$/.test(pin.trim())) {
+      setError('رمز PIN يجب أن يتكون من 4 أرقام بالضبط');
       return;
     }
 
@@ -185,9 +185,9 @@ export function UserFormModal({
               backgroundColor: '#FFFFFF',
             }}
           >
-            <option value={USER_ROLES.CASHIER}>🧑‍💼 كاشير (واجهة البيع السريع والوردية)</option>
-            <option value={USER_ROLES.MANAGER}>👔 مدير (إشراف تشغيلي واعتماد الخصومات)</option>
-            <option value={USER_ROLES.OWNER}>👑 مالك (الصلاحيات الكاملة والأرباح والنسخ)</option>
+            <option value={USER_ROLES.CASHIER}>كاشير (واجهة البيع السريع والوردية)</option>
+            <option value={USER_ROLES.MANAGER}>مدير (إشراف تشغيلي واعتماد الخصومات)</option>
+            <option value={USER_ROLES.OWNER}>مالك (الصلاحيات الكاملة والأرباح والنسخ)</option>
           </select>
         </div>
 
@@ -215,14 +215,14 @@ export function UserFormModal({
 
         <div>
           <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            رمز الـ PIN للدخول السريع والتفويض (4 إلى 6 أرقام)
+            رمز الـ PIN للدخول السريع والتفويض (4 أرقام)
           </label>
           <input
             type="text"
             value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="مثال: 1234"
-            maxLength={6}
+            maxLength={4}
             style={{
               width: '100%',
               height: 40,

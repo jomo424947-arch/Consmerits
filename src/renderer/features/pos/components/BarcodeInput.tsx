@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { Scan, CornerDownLeft, Sparkles } from 'lucide-react';
 import { GlassIcon } from '../../../components/common/GlassIcon';
+import { AppIcon } from '../../../components/common/AppIcon';
 
 interface BarcodeInputProps {
   onScan: (barcode: string) => void;
@@ -35,13 +35,13 @@ export function BarcodeInput({ onScan, isLoading = false }: BarcodeInputProps): 
         backgroundColor: '#FFFFFF',
         borderRadius: 14,
         padding: '6px 14px',
-        border: '1.5px solid #D5DAD6',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+        border: '1.5px solid #F0E8EA',
+        boxShadow: '0 2px 10px rgba(255, 149, 165, 0.06)',
         transition: 'all 0.2s ease',
       }}
       onClick={() => inputRef.current?.focus()}
     >
-      <GlassIcon icon={Scan} size="md" variant="brand" glow />
+      <GlassIcon icon="qr_code_scanner" size="md" variant="brand" glow />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <input
@@ -55,10 +55,10 @@ export function BarcodeInput({ onScan, isLoading = false }: BarcodeInputProps): 
             height: 38,
             border: 'none',
             outline: 'none',
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: 500,
             color: 'var(--text-main)',
-            fontFamily: 'inherit',
+            fontFamily: 'var(--font-family)',
             background: 'transparent',
           }}
         />
@@ -68,18 +68,20 @@ export function BarcodeInput({ onScan, isLoading = false }: BarcodeInputProps): 
         <span
           className="kbd-badge"
           style={{
-            backgroundColor: '#F0F3F1',
-            color: 'var(--color-brand-deep)',
-            borderColor: '#D0D8D3',
+            backgroundColor: '#FFF0F3',
+            color: '#D63B5E',
+            borderColor: 'rgba(255, 149, 165, 0.35)',
             height: 26,
             padding: '0 8px',
             fontSize: 12,
             display: 'flex',
             alignItems: 'center',
             gap: 4,
+            fontFamily: 'Space Grotesk, monospace',
+            fontWeight: 600,
           }}
         >
-          <CornerDownLeft size={12} />
+          <AppIcon name="keyboard_return" size={13} color="#D63B5E" />
           <span>Enter</span>
         </span>
       </div>

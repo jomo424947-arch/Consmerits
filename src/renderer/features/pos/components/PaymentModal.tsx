@@ -11,6 +11,7 @@ import {
 import { Modal } from '../../../components/common/Modal';
 import { Button } from '../../../components/common/Button';
 import { GlassIcon } from '../../../components/common/GlassIcon';
+import { AppIcon } from '../../../components/common/AppIcon';
 import { formatMoney } from '../../../../shared/utils/money';
 import { CartLineItem } from '../types';
 import { sounds } from '../../../lib/sounds';
@@ -419,7 +420,7 @@ export function PaymentModal({
               onChange={(e) => setPrintReceipt(e.target.checked)}
               style={{ width: 16, height: 16, accentColor: 'var(--color-primary)' }}
             />
-            <Printer size={16} color="var(--color-primary)" />
+            <AppIcon name="print" size={17} color="var(--color-primary)" />
             <span>طباعة الإيصال الحراري تلقائياً</span>
           </label>
         </div>
@@ -438,7 +439,7 @@ export function PaymentModal({
               gap: 8,
             }}
           >
-            <AlertCircle size={16} />
+            <AppIcon name="error" size={17} />
             <span>{error}</span>
           </div>
         )}
@@ -454,12 +455,13 @@ export function PaymentModal({
             style={{
               flex: 1,
               height: 48,
-              fontSize: 16,
+              fontSize: 15.5,
               fontWeight: 700,
+              gap: 8,
             }}
           >
-            <CheckCircle2 size={18} />
-            <span>تأكيد وطباعة الفاتورة ⏎</span>
+            <AppIcon name="check_circle" size={19} />
+            <span>تأكيد وطباعة الفاتورة</span>
           </Button>
 
           <Button

@@ -20,7 +20,7 @@ export function LoadingOverlay({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: transparent ? 'rgba(255, 255, 255, 0.7)' : 'rgba(244, 245, 242, 0.85)',
+        backgroundColor: transparent ? 'rgba(255, 255, 255, 0.7)' : 'rgba(250, 249, 249, 0.88)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         borderRadius: 'inherit',
@@ -35,16 +35,16 @@ export function LoadingOverlay({
           padding: '20px 32px',
           backgroundColor: '#FFFFFF',
           borderRadius: 14,
-          boxShadow: '0 8px 24px rgba(47, 74, 62, 0.08)',
-          border: '1px solid #E1E4E0',
+          boxShadow: '0 8px 24px rgba(255, 149, 165, 0.12)',
+          border: '1px solid #F0E8EA',
         }}
       >
         <Loader2
           size={32}
-          color="#4F6B5E"
+          color="#FF7088"
           style={{ animation: 'spin 1s linear infinite' }}
         />
-        <span style={{ fontSize: 14, fontWeight: 500, color: '#2F4A3E' }}>{message}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand-deep)' }}>{message}</span>
       </div>
       <style>{`
         @keyframes spin {

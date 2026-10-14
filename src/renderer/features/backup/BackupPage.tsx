@@ -175,40 +175,31 @@ export function BackupPage(): React.ReactElement {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '18px 20px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={HardDriveDownload} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>النسخ الاحتياطية المتوفرة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {backups.length} نسخة محلية
-            </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>النسخ الاحتياطية المتوفرة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {backups.length} نسخة محلية
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '18px 20px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={ShieldCheck} size="lg" variant="success" glow />
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>فحص سلامة قاعدة البيانات</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#21633D', marginTop: 2 }}>
-              سليمة وتعمل بـ WAL
-            </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>فحص سلامة قاعدة البيانات</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#21633D', marginTop: 4 }}>
+            سليمة وتعمل بـ WAL
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '18px 20px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Usb} size="lg" variant="primary" glow />
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>تصدير خارجي USB</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-brand-deep)', marginTop: 2 }}>
-              جاهز للتصدير
-            </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>تصدير خارجي USB</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            جاهز للتصدير
           </div>
         </div>
       </div>

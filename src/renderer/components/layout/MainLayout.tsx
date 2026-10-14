@@ -94,7 +94,41 @@ export function MainLayout({
             position: 'relative',
           }}
         >
-          {children}
+          {/* هالات الإضاءة الجمالية الناعمة المطابقة لصفحة تسجيل الدخول */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'fixed',
+              top: -60,
+              left: 120,
+              width: 500,
+              height: 500,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255, 149, 165, 0.08) 0%, transparent 70%)',
+              filter: 'blur(75px)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'fixed',
+              bottom: 40,
+              right: 280,
+              width: 460,
+              height: 460,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255, 149, 165, 0.06) 0%, transparent 70%)',
+              filter: 'blur(80px)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+
+          <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>
+            {children}
+          </div>
         </main>
 
         <StatusBar />

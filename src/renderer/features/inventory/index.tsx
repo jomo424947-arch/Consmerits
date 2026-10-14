@@ -135,80 +135,45 @@ export function InventoryScreen(): React.ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, height: '100%' }}>
       {/* بطاقات المؤشرات العلوية */}
+      {/* بطاقات المؤشرات العلوية */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Package} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي التشغيلات المسجلة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {batches.length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي التشغيلات المسجلة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {batches.length}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={CheckCircle2} size="lg" variant="success" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>تشغيلات صالحة وبعيدة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D' }}>
-              {validCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>تشغيلات صالحة وبعيدة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D', marginTop: 4 }}>
+            {validCount}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={AlertTriangle} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>أوشكت على الانتهاء (&lt;45 يوم)</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910' }}>
-              {expiringNearCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>أوشكت على الانتهاء (&lt;45 يوم)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910', marginTop: 4 }}>
+            {expiringNearCount}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{
-            padding: '16px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            backgroundColor: '#FFFFFF',
-          }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={AlertCircle} size="lg" variant="danger" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>منتهية الصلاحية (ممنوع البيع)</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34' }}>
-              {expiredCount}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>منتهية الصلاحية (ممنوع البيع)</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34', marginTop: 4 }}>
+            {expiredCount}
           </div>
         </div>
       </div>
@@ -394,11 +359,11 @@ export function InventoryScreen(): React.ReactElement {
 
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                           {isExp ? (
-                            <span className="badge badge-danger">منتهية الصلاحية ✕</span>
+                            <span className="badge badge-danger">منتهية الصلاحية</span>
                           ) : isNear ? (
-                            <span className="badge badge-warn">تنبيه: تنتهي قريباً !</span>
+                            <span className="badge badge-warn">تنبيه: تنتهي قريباً</span>
                           ) : (
-                            <span className="badge badge-success">صالحة ونشطة ✓</span>
+                            <span className="badge badge-success">صالحة ونشطة</span>
                           )}
                         </td>
                       </tr>

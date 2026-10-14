@@ -214,53 +214,41 @@ export function PurchasesScreen(): React.ReactElement {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Truck} size="lg" variant="info" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المشتريات</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {formatMoney(totalPurchases)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المشتريات</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {formatMoney(totalPurchases)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={Users} size="lg" variant="primary" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الموردين النشطين</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {suppliers.length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الموردين النشطين</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {suppliers.length}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={DollarSign} size="lg" variant="gold" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>مستحقات آجلة للموردين</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#A87910' }}>
-              {formatMoney(totalPayableToSuppliers)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>مستحقات آجلة للموردين</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#A87910', marginTop: 4 }}>
+            {formatMoney(totalPayableToSuppliers)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={FileText} size="lg" variant="brand" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الفواتير المستلمة</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {invoices.length}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد الفواتير المستلمة</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {invoices.length}
           </div>
         </div>
       </div>
@@ -445,7 +433,7 @@ export function PurchasesScreen(): React.ReactElement {
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         {inv.paid >= inv.total ? (
-                          <span className="badge badge-success">مسددة بالكامل ✓</span>
+                          <span className="badge badge-success">مسددة بالكامل</span>
                         ) : inv.paid > 0 ? (
                           <span className="badge badge-warn">سداد جزئي</span>
                         ) : (
@@ -516,7 +504,7 @@ export function PurchasesScreen(): React.ReactElement {
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         {(s.balance || 0) <= 0 ? (
-                          <span className="badge badge-success">حساب خالص ✓</span>
+                          <span className="badge badge-success">حساب خالص</span>
                         ) : (
                           <span className="badge badge-warn">مستحق السداد</span>
                         )}

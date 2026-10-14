@@ -11,7 +11,7 @@ import { CashScreen } from './features/cash';
 import { ReportsScreen } from './features/reports';
 import { SettingsScreen } from './features/settings';
 import { InvoicesScreen } from './features/invoices';
-import { LoginPage, LockScreen } from './features/auth';
+import { LoginPage, LockScreen, InitialSetupWizard } from './features/auth';
 import { SafeUser } from '../shared/types/users.types';
 import { Loader2 } from 'lucide-react';
 
@@ -31,14 +31,21 @@ export function AppContent(): React.ReactElement {
   const [currentUser, setCurrentUser] = useState<SafeUser | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isSetupCompleted, setIsSetupCompleted] = useState(true);
 
   const lastActivityReport = useRef(0);
 
-  // فحص الجلسة الحالية عند الإقلاع
+  // فحص الجلسة الحالية وحالة تهيئة النظام عند الإقلاع
   useEffect(() => {
     const checkInitialSession = async () => {
       try {
         const electron = (window as any).electron;
+        if (electron?.checkSetupStatus) {
+          const setupRes = await electron.checkSetupStatus();
+          if (setupRes && setupRes.success !== false) {
+            setIsSetupCompleted(setupRes.isSetupCompleted);
+          }
+        }
         if (electron?.getCurrentUser) {
           const res = await electron.getCurrentUser();
           if (res?.success && res.data) {
@@ -96,16 +103,30 @@ export function AppContent(): React.ReactElement {
           justifyContent: 'center',
           gap: 16,
           height: '100vh',
-          backgroundColor: '#1B2B24',
-          color: '#E3EAE5',
+          backgroundColor: '#FFFFFF',
+          color: '#1A1F26',
           fontSize: 16,
+          fontWeight: 600,
           fontFamily: 'inherit',
           direction: 'rtl',
         }}
       >
-        <Loader2 size={36} color="#E3EAE5" style={{ animation: 'spin 1s linear infinite' }} />
-        <span>جاري تهيئة وتشغيل نظام كوزمتكس ستور الآمن...</span>
+        <Loader2 size={36} color="#FF7088" style={{ animation: 'spin 1s linear infinite' }} />
+        <span>جاري تهيئة وتشغيل نظام كوزمتكس ستور...</span>
       </div>
+    );
+  }
+
+  // إذا لم يتم إعداد النظام لأول مرة، نعرض معالج الإعداد الأولي
+  if (!isSetupCompleted) {
+    return (
+      <InitialSetupWizard
+        onSetupComplete={(user) => {
+          setCurrentUser(user);
+          setIsSetupCompleted(true);
+          setIsLocked(false);
+        }}
+      />
     );
   }
 

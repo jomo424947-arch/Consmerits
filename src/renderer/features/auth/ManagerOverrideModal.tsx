@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, AlertCircle, CheckCircle2, Delete } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { Button } from '../../components/common/Button';
 import { GlassIcon } from '../../components/common/GlassIcon';
@@ -37,8 +37,14 @@ export function ManagerOverrideModal({
       if (e.key >= '0' && e.key <= '9') {
         e.preventDefault();
         sounds.playClick();
-        setPin((prev) => (prev.length < 6 ? prev + e.key : prev));
-        setError(null);
+        if (pin.length < 4) {
+          const nextPin = pin + e.key;
+          setPin(nextPin);
+          setError(null);
+          if (nextPin.length === 4) {
+            handleSubmit(nextPin);
+          }
+        }
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         sounds.playClick();
@@ -66,9 +72,13 @@ export function ManagerOverrideModal({
 
   const handleDigit = (digit: string) => {
     sounds.playClick();
-    if (pin.length < 6) {
-      setPin((prev) => prev + digit);
+    if (pin.length < 4) {
+      const nextPin = pin + digit;
+      setPin(nextPin);
       setError(null);
+      if (nextPin.length === 4) {
+        handleSubmit(nextPin);
+      }
     }
   };
 
@@ -84,9 +94,10 @@ export function ManagerOverrideModal({
     setError(null);
   };
 
-  const handleSubmit = async () => {
-    if (!pin) {
-      triggerError('يرجى إدخال رمز PIN للمدير');
+  const handleSubmit = async (pinOverride?: string) => {
+    const effectivePin = pinOverride || pin;
+    if (!effectivePin || effectivePin.length !== 4) {
+      triggerError('يرجى إدخال رمز PIN المكون من 4 أرقام للمدير');
       return;
     }
 
@@ -101,7 +112,7 @@ export function ManagerOverrideModal({
         return;
       }
 
-      const res = await electron.requestOverride(permission, pin);
+      const res = await electron.requestOverride(permission, effectivePin);
       if (res?.success) {
         sounds.playSaleSuccess();
         onApproved(res.authorizedBy || 'المدير');
@@ -179,12 +190,12 @@ export function ManagerOverrideModal({
             border: '1px solid #D5DAD6',
           }}
         >
-          {[0, 1, 2, 3, 4, 5].map((idx) => (
+          {[0, 1, 2, 3].map((idx) => (
             <div
               key={idx}
               style={{
-                width: 12,
-                height: 12,
+                width: 14,
+                height: 14,
                 borderRadius: '50%',
                 backgroundColor: idx < pin.length ? 'var(--color-brand-deep)' : '#CCD3CE',
                 transform: idx < pin.length ? 'scale(1.25)' : 'scale(1)',
@@ -270,9 +281,12 @@ export function ManagerOverrideModal({
               backgroundColor: '#FAFBF9',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            ⌫
+            <Delete size={18} />
           </button>
         </div>
 
@@ -280,12 +294,12 @@ export function ManagerOverrideModal({
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
           <Button
             variant="primary"
-            onClick={handleSubmit}
-            disabled={isVerifying || pin.length < 4}
+            onClick={() => handleSubmit()}
+            disabled={isVerifying || pin.length !== 4}
             isLoading={isVerifying}
             style={{ flex: 1, height: 44, fontSize: 14 }}
           >
-            اعتماد وتفويض ✓
+            اعتماد وتفويض
           </Button>
           <Button
             variant="secondary"

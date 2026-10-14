@@ -191,6 +191,78 @@ export function usePos() {
     []
   );
 
+  /**
+   * إضافة منتج أو variant مباشرة من الكتالوج بنقرة زر
+   */
+  const addProductToCart = useCallback(
+    (
+      product: { id: number; name?: string; name_ar?: string; variants?: any[] },
+      variant?: { id: number; name?: string; sale_price?: number; price?: number; total_stock?: number; barcodes?: string[] }
+    ): { success: boolean; message?: string } => {
+      const targetVariant = variant || product.variants?.[0] || (product as any);
+      const variantId = targetVariant?.id || product.id;
+      const unitPrice = targetVariant?.sale_price ?? targetVariant?.price ?? (product as any).price ?? 0;
+      const productName = product.name_ar || product.name || 'منتج';
+      const variantName = targetVariant?.name && targetVariant.name !== 'الافتراضي' ? targetVariant.name : undefined;
+      const barcode = targetVariant?.barcodes?.[0] || (product as any).primaryBarcode || `SKU-${variantId}`;
+      const availableStock = targetVariant?.total_stock !== undefined ? targetVariant.total_stock : (product as any).totalStock ?? 999;
+
+      // فحص إذا كان الصنف موجوداً مسبقاً في السلة لزيادة الكمية
+      const existingIndex = cart.findIndex((i) => i.variantId === variantId);
+      if (existingIndex >= 0) {
+        const item = cart[existingIndex];
+        if (item.availableStock !== undefined && item.qty + 1 > item.availableStock) {
+          sounds.playError();
+          return {
+            success: false,
+            message: `الكمية المطلوبة تتجاوز الرصيد المتوفر بالمخزون (${item.availableStock} قطعة)`,
+          };
+        }
+        sounds.playBarcodeBeep();
+        setCart((prev) => {
+          const next = [...prev];
+          const newQty = item.qty + 1;
+          next[existingIndex] = {
+            ...item,
+            qty: newQty,
+            total: Math.max(0, item.unitPrice * newQty - (item.discount || 0)),
+          };
+          setLastScannedItem(next[existingIndex]);
+          return next;
+        });
+        return { success: true };
+      }
+
+      // التحقق من الرصيد المتوفر لمنع البيع بالسالب
+      if (availableStock <= 0) {
+        sounds.playError();
+        return {
+          success: false,
+          message: `عذراً، الصنف "${productName}" نفد من المخزون تماماً (الرصيد: 0)`,
+        };
+      }
+
+      const newItem: CartLineItem = {
+        id: `${variantId}-${Date.now()}`,
+        variantId,
+        productName,
+        variantName,
+        barcode,
+        unitPrice,
+        qty: 1,
+        availableStock,
+        discount: 0,
+        total: unitPrice,
+      };
+
+      sounds.playBarcodeBeep();
+      setCart((prev) => [newItem, ...prev]);
+      setLastScannedItem(newItem);
+      return { success: true };
+    },
+    [cart]
+  );
+
   return {
     cart,
     subtotal,
@@ -206,6 +278,7 @@ export function usePos() {
     setCustomerId,
     setCustomerName,
     addItemByBarcode,
+    addProductToCart,
     updateQuantity,
     applyItemDiscount,
     removeItem,

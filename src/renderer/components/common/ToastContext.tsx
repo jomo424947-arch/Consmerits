@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { GlassIcon } from './GlassIcon';
+import { AppIcon } from './AppIcon';
 import { sounds } from '../../lib/sounds';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -157,7 +158,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
                   borderRadius: 4,
                 }}
               >
-                <X size={16} />
+                <AppIcon name="close" size={16} />
               </button>
             </div>
           );

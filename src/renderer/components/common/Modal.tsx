@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { AppIcon } from './AppIcon';
 import { sounds } from '../../lib/sounds';
 
 export interface ModalProps {
@@ -71,6 +71,7 @@ export function Modal({
           borderRadius: 16,
           padding: 0,
           overflow: 'hidden',
+          fontFamily: 'var(--font-family)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -86,7 +87,7 @@ export function Modal({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {icon}
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-brand-deep)', margin: 0 }}>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-brand-deep)', margin: 0 }}>
               {title}
             </h3>
           </div>
@@ -112,7 +113,7 @@ export function Modal({
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F0F2F0')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
-            <X size={18} />
+            <AppIcon name="close" size={18} />
           </button>
         </div>
 

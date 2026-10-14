@@ -324,53 +324,41 @@ export function CashScreen(): React.ReactElement {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <div
               className="glass-card"
-              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+              style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
             >
-              <GlassIcon icon={Coins} size="lg" variant="gold" glow />
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>نقدية الدرج الحالية</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910' }}>
-                  {formatMoney(currentDrawerCash)}
-                </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>نقدية الدرج الحالية</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#A87910', marginTop: 4 }}>
+                {formatMoney(currentDrawerCash)}
               </div>
             </div>
 
             <div
               className="glass-card"
-              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+              style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
             >
-              <GlassIcon icon={TrendingUp} size="lg" variant="success" glow />
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي مبيعات الكاش</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D' }}>
-                  {formatMoney(totalSalesCash)}
-                </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي مبيعات الكاش</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D', marginTop: 4 }}>
+                {formatMoney(totalSalesCash)}
               </div>
             </div>
 
             <div
               className="glass-card"
-              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+              style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
             >
-              <GlassIcon icon={TrendingDown} size="lg" variant="danger" glow />
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>المصروفات والسحوبات</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34' }}>
-                  {formatMoney(totalExpenses)}
-                </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>المصروفات والسحوبات</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#962B34', marginTop: 4 }}>
+                {formatMoney(totalExpenses)}
               </div>
             </div>
 
             <div
               className="glass-card"
-              style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+              style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
             >
-              <GlassIcon icon={DollarSign} size="lg" variant="brand" glow />
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>الرصيد الافتتاحي</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-                  {formatMoney(activeShift.opening_balance || 0)}
-                </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>الرصيد الافتتاحي</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+                {formatMoney(activeShift.opening_balance || 0)}
               </div>
             </div>
           </div>
@@ -387,7 +375,7 @@ export function CashScreen(): React.ReactElement {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="badge badge-success">الوردية #{activeShift.id} مفتوحة نشطة ✓</span>
+              <span className="badge badge-success">الوردية #{activeShift.id} مفتوحة نشطة</span>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                 افتتحت في: {activeShift.opened_at?.slice(0, 16)}
               </span>

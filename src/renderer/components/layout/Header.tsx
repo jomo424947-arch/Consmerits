@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, ShieldCheck, Clock } from 'lucide-react';
+import { AppIcon } from '../common/AppIcon';
 import { sounds } from '../../lib/sounds';
 
 interface HeaderProps {
@@ -43,7 +43,7 @@ export function Header({ title }: HeaderProps): React.ReactElement {
       className="glass-header"
       style={{
         height: 60,
-        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        backgroundColor: 'rgba(255, 255, 255, 0.94)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border-light)',
         padding: '0 24px',
@@ -62,6 +62,7 @@ export function Header({ title }: HeaderProps): React.ReactElement {
             color: 'var(--color-brand-deep)',
             margin: 0,
             letterSpacing: '-0.2px',
+            fontFamily: 'var(--font-family)',
           }}
         >
           {title}
@@ -74,38 +75,18 @@ export function Header({ title }: HeaderProps): React.ReactElement {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 7,
             fontSize: 12,
             fontWeight: 500,
             color: 'var(--text-muted)',
-            backgroundColor: '#F5F7F5',
+            backgroundColor: '#FFF9FA',
             padding: '5px 12px',
             borderRadius: 20,
-            border: '1px solid #E4E8E5',
+            border: '1px solid #F5EAEB',
           }}
         >
-          <Clock size={13} color="var(--color-primary)" />
-          <span>{currentTime}</span>
-        </div>
-
-        {/* مؤشر الاتصال المحلي وقاعدة البيانات */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
-            padding: '5px 12px',
-            borderRadius: 20,
-            backgroundColor: 'var(--color-success-bg)',
-            border: '1px solid rgba(33, 99, 61, 0.25)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--color-success-text)',
-          }}
-        >
-          <span className="pulse-indicator" />
-          <ShieldCheck size={14} />
-          <span>محلي آمن (WAL)</span>
+          <AppIcon name="schedule" size={15} color="#FF7088" />
+          <span style={{ fontFamily: 'var(--font-family)' }}>{currentTime}</span>
         </div>
 
         {/* زر قفل الشاشة السريع */}
@@ -119,11 +100,11 @@ export function Header({ title }: HeaderProps): React.ReactElement {
             fontSize: 13,
             gap: 8,
             borderRadius: 8,
+            fontWeight: 600,
           }}
         >
-          <Lock size={14} />
+          <AppIcon name="lock" size={15} />
           <span>قفل الشاشة</span>
-          <span className="kbd-badge kbd-badge-dark">F12</span>
         </button>
       </div>
     </header>

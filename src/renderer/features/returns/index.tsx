@@ -153,40 +153,31 @@ export function ReturnsScreen(): React.ReactElement {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={RotateCcw} size="lg" variant="danger" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المبالغ المستردة</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#962B34' }}>
-              {formatMoney(totalRefunded)}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>إجمالي المبالغ المستردة</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#962B34', marginTop: 4 }}>
+            {formatMoney(totalRefunded)}
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={FileText} size="lg" variant="brand" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد عمليات الإرجاع</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)' }}>
-              {returns.length} عملية
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>عدد عمليات الإرجاع</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-brand-deep)', marginTop: 4 }}>
+            {returns.length} عملية
           </div>
         </div>
 
         <div
           className="glass-card"
-          style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF' }}
+          style={{ padding: '16px 18px', backgroundColor: '#FFFFFF' }}
         >
-          <GlassIcon icon={CheckCircle2} size="lg" variant="success" glow />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>سياسة الإرجاع والاستبدال</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#21633D' }}>
-              14 يوماً مع إرجاع فوري للمخزون
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>سياسة الإرجاع والاستبدال</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#21633D', marginTop: 4 }}>
+            14 يوماً مع إرجاع فوري للمخزون
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { LucideIcon, PackageOpen } from 'lucide-react';
 import { GlassIcon, GlassIconVariant } from './GlassIcon';
 
 export interface EmptyStateProps {
-  icon?: LucideIcon;
+  icon?: LucideIcon | string;
   variant?: GlassIconVariant;
   title: string;
   description?: string;
@@ -35,17 +35,17 @@ export function EmptyState({
         textAlign: 'center',
         background: 'rgba(255, 255, 255, 0.5)',
         borderRadius: 16,
-        border: '1.5px dashed #D5DAD6',
+        border: '1.5px dashed #EAE2E4',
         margin: '16px 0',
         ...style,
       }}
     >
       <GlassIcon icon={icon} size="2xl" variant={variant} glow style={{ marginBottom: 16 }} />
-      <h3 style={{ fontSize: 17, fontWeight: 600, color: '#2F4A3E', marginBottom: 6 }}>
+      <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-brand-deep)', marginBottom: 6 }}>
         {title}
       </h3>
       {description && (
-        <p style={{ fontSize: 14, color: '#6B726E', maxWidth: 400, lineHeight: 1.5, marginBottom: actionLabel ? 20 : 0 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 400, lineHeight: 1.5, marginBottom: actionLabel ? 20 : 0 }}>
           {description}
         </p>
       )}

@@ -11,6 +11,8 @@ export const IPC_CHANNELS = {
   AUTH_GET_CURRENT_USER: 'auth:get-current-user',
   AUTH_CHANGE_PASSWORD: 'auth:change-password',
   AUTH_RESET_PIN: 'auth:reset-pin',
+  AUTH_CHECK_SETUP_STATUS: 'auth:check-setup-status',
+  AUTH_COMPLETE_INITIAL_SETUP: 'auth:complete-initial-setup',
 
   // Users Management
   USERS_LIST: 'users:list',
