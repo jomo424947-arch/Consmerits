@@ -45,13 +45,7 @@ export function registerSalesIpcHandlers(): void {
 
       const sale = await salesService.createSale(parsed.data, resolvedUserId, resolvedShiftId);
 
-      // طباعة الإيصال إن أمكن
-      try {
-        await receiptPrinter.printSaleReceipt(sale);
-      } catch (printErr) {
-        console.warn('تنبيه: تعذر طباعة الإيصال آلياً:', printErr);
-      }
-
+      // إرجاع الفاتورة فوراً للواجهة للمعاينة السلسة وتفادي أي تعليق في الشاشة
       return { success: true, data: sale };
     } catch (err: any) {
       return { success: false, error: err.message };

@@ -40,6 +40,9 @@ export interface Sale {
   void_reason?: string | null;
   notes?: string | null;
   created_at: string;
+  cashier_name?: string;
+  customer_name?: string;
+  customer_phone?: string;
   items?: SaleItem[];
   payments?: SalePayment[];
 }

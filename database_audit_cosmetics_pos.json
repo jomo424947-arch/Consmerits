@@ -1,23 +1,13 @@
 {
-  "analyzedAt": "2026-10-14T16:07:02.123Z",
+  "analyzedAt": "2026-10-15T14:35:55.775Z",
   "databaseFile": "C:\\Users\\jomo4\\AppData\\Roaming\\cosmetics-pos-system\\cosmetics_pos.db",
   "fileSizeBytes": 475136,
   "integrity": "ok",
   "store": {
-    "name": "Yousaf",
-    "phone": "01098"
+    "name": "بوتيك جوري - كوزمتكس",
+    "phone": "غير محدد"
   },
-  "users": [
-    {
-      "id": 1,
-      "username": "jo11",
-      "display_name": "jo",
-      "role": "owner",
-      "is_active": 1,
-      "created_at": "2026-10-14 15:19:50",
-      "has_pin": 1
-    }
-  ],
+  "users": [],
   "contacts": {
     "customers": [],
     "suppliers": []

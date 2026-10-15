@@ -218,8 +218,31 @@ export class ProductsService {
           insertBarcode.run(variantId, autoBarcode, 1);
         } else {
           barcodes.forEach((bCode) => {
-            const isInternal = bCode.startsWith('20') ? 1 : 0;
-            insertBarcode.run(variantId, bCode.trim(), isInternal);
+            const cleanCode = bCode.trim();
+            if (!cleanCode) return;
+
+            // فحص هل الباركود مستخدم بالفعل لصنف آخر
+            const existingBarcode = db
+              .prepare('SELECT id, variant_id FROM product_barcodes WHERE barcode = ?')
+              .get(cleanCode) as { id: number; variant_id: number } | undefined;
+
+            if (existingBarcode) {
+              const otherProd = db
+                .prepare(
+                  'SELECT is_active, name_ar FROM products WHERE id = (SELECT product_id FROM product_variants WHERE id = ?)'
+                )
+                .get(existingBarcode.variant_id) as { is_active: number; name_ar: string } | undefined;
+
+              if (otherProd && otherProd.is_active === 0) {
+                // الصنف السابق غير نشط/مؤرشف، نحرر الباركود لاستخدامه للصنف الجديد
+                db.prepare('DELETE FROM product_barcodes WHERE id = ?').run(existingBarcode.id);
+              } else {
+                throw new Error(`الباركود "${cleanCode}" مسجل مسبقاً للصنف "${otherProd?.name_ar || 'آخر'}"`);
+              }
+            }
+
+            const isInternal = cleanCode.startsWith('20') ? 1 : 0;
+            insertBarcode.run(variantId, cleanCode, isInternal);
           });
         }
 
@@ -279,6 +302,8 @@ export class ProductsService {
       let brandId = input.brand_id;
       if (brandId === undefined && input.brand_name && input.brand_name.trim()) {
         brandId = this.getOrCreateBrand(input.brand_name);
+      } else if (input.brand_name === null || input.brand_name === '') {
+        brandId = null;
       }
 
       const updates: string[] = ["updated_at = datetime('now')"];
@@ -376,30 +401,78 @@ export class ProductsService {
         }
 
         // 3. تحديث الباركود
-        const newBarcodes = input.barcodes || (input.barcode ? [input.barcode.trim()] : null);
-        if (newBarcodes && newBarcodes.length > 0) {
-          const barcode = newBarcodes[0].trim();
-          if (barcode) {
-            const existingSame = db
-              .prepare('SELECT id FROM product_barcodes WHERE variant_id = ? AND barcode = ?')
-              .get(targetVariantId, barcode);
+        const hasExplicitBarcode = input.barcodes !== undefined || input.barcode !== undefined;
+        if (hasExplicitBarcode) {
+          const barcodeList = input.barcodes || (input.barcode ? [input.barcode.trim()] : []);
+          if (barcodeList.length === 0) {
+            db.prepare('DELETE FROM product_barcodes WHERE variant_id = ?').run(targetVariantId);
+          } else {
+            const barcode = barcodeList[0].trim();
+            if (barcode) {
+              const existingSame = db
+                .prepare('SELECT id FROM product_barcodes WHERE variant_id = ? AND barcode = ?')
+                .get(targetVariantId, barcode);
 
-            if (!existingSame) {
-              const existingOther = db
-                .prepare('SELECT id, variant_id FROM product_barcodes WHERE barcode = ?')
-                .get(barcode) as { id: number; variant_id: number } | undefined;
+              if (!existingSame) {
+                const existingOther = db
+                  .prepare('SELECT id, variant_id FROM product_barcodes WHERE barcode = ?')
+                  .get(barcode) as { id: number; variant_id: number } | undefined;
 
-              if (existingOther && existingOther.variant_id !== targetVariantId) {
-                throw new Error(`الباركود "${barcode}" مستخدم بالفعل لمنتج آخر`);
+                if (existingOther && existingOther.variant_id !== targetVariantId) {
+                  // فحص ما إذا كان الباركود ينتمي لصنف غير نشط/مؤرشف لتحريره
+                  const otherProd = db
+                    .prepare(
+                      'SELECT is_active FROM products WHERE id = (SELECT product_id FROM product_variants WHERE id = ?)'
+                    )
+                    .get(existingOther.variant_id) as { is_active: number } | undefined;
+
+                  if (otherProd && otherProd.is_active === 0) {
+                    db.prepare('DELETE FROM product_barcodes WHERE id = ?').run(existingOther.id);
+                  } else {
+                    throw new Error(`الباركود "${barcode}" مستخدم بالفعل لمنتج آخر`);
+                  }
+                }
+
+                db.prepare('DELETE FROM product_barcodes WHERE variant_id = ?').run(targetVariantId);
+                const isInternal = barcode.startsWith('20') ? 1 : 0;
+                db.prepare('INSERT INTO product_barcodes (variant_id, barcode, is_internal) VALUES (?, ?, ?)').run(
+                  targetVariantId,
+                  barcode,
+                  isInternal
+                );
               }
+            }
+          }
+        }
 
-              db.prepare('DELETE FROM product_barcodes WHERE variant_id = ?').run(targetVariantId);
-              const isInternal = barcode.startsWith('20') ? 1 : 0;
-              db.prepare('INSERT INTO product_barcodes (variant_id, barcode, is_internal) VALUES (?, ?, ?)').run(
-                targetVariantId,
-                barcode,
-                isInternal
-              );
+        // 4. تسوية رصيد المخزون في حال تم تحديده
+        if ((input as any).stock !== undefined && (input as any).stock !== null) {
+          const newStock = Number((input as any).stock);
+          if (!isNaN(newStock) && newStock >= 0) {
+            const batch = db
+              .prepare('SELECT id, qty_remaining FROM batches WHERE variant_id = ? ORDER BY id ASC LIMIT 1')
+              .get(targetVariantId) as { id: number; qty_remaining: number } | undefined;
+
+            if (batch) {
+              const diff = newStock - batch.qty_remaining;
+              if (diff !== 0) {
+                const moveType = diff > 0 ? 'adjust_in' : 'adjust_out';
+                db.prepare('UPDATE batches SET qty_remaining = ? WHERE id = ?').run(newStock, batch.id);
+                db.prepare(`
+                  INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
+                  VALUES (?, ?, ?, 'manual_adjustment', ?, ?, 'تسوية يدوية للرصيد من تعديل الصنف', datetime('now'))
+                `).run(batch.id, moveType, Math.abs(diff), id, actorUserId ?? null);
+              }
+            } else {
+              const batchRes = db.prepare(`
+                INSERT INTO batches (variant_id, batch_no, expiry_date, unit_cost, qty_remaining, received_at)
+                VALUES (?, ?, NULL, 0, ?, datetime('now'))
+              `).run(targetVariantId, `B-INIT-${id}`, newStock);
+              const newBatchId = Number(batchRes.lastInsertRowid);
+              db.prepare(`
+                INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
+                VALUES (?, 'adjust_in', ?, 'initial_stock', ?, ?, 'رصيد مخزون من تعديل الصنف', datetime('now'))
+              `).run(newBatchId, newStock, id, actorUserId ?? null);
             }
           }
         }
@@ -477,8 +550,11 @@ export class ProductsService {
       if (batches.length > 0) {
         const batchIds = batches.map((b) => b.id);
         const bPlaceholders = batchIds.map(() => '?').join(',');
+        // الحركات التي تدل على نشاط تجاري حقيقي وليست مجرد رصيد افتتاحي
         const moveCount = db
-          .prepare(`SELECT COUNT(*) as count FROM stock_movements WHERE batch_id IN (${bPlaceholders})`)
+          .prepare(
+            `SELECT COUNT(*) as count FROM stock_movements WHERE batch_id IN (${bPlaceholders}) AND type NOT IN ('adjust_in')`
+          )
           .get(...batchIds) as { count: number };
         if (moveCount.count > 0) hasMovements = true;
       }
@@ -493,6 +569,8 @@ export class ProductsService {
         if (variantIds.length > 0) {
           const placeholders = variantIds.map(() => '?').join(',');
           db.prepare(`UPDATE product_variants SET is_active = 0 WHERE id IN (${placeholders})`).run(...variantIds);
+          // تحرير الباركودات المرتبطة لكي يتمكن المتجر من إعادة استخدامها إن رغب
+          db.prepare(`DELETE FROM product_barcodes WHERE variant_id IN (${placeholders})`).run(...variantIds);
         }
 
         if (actorUserId) {
@@ -503,7 +581,7 @@ export class ProductsService {
             entityId: id,
             details: {
               product_name: product.name_ar,
-              reason: 'أرشفة المنتج لوجود حركات مبيعات أو مخزون سابقة',
+              reason: 'أرشفة المنتج لوجود حركات مبيعات أو مشتريات سابقة',
               has_sales: hasSales,
               has_movements: hasMovements,
             },
@@ -514,13 +592,25 @@ export class ProductsService {
       return {
         success: true,
         action: 'archived',
-        message: `تم أرشفة المنتج "${product.name_ar}" وإخفاؤه بنجاح نظراً لوجود مبيعات أو حركات مخزون سابقة مرتبطة به.`,
+        message: `تم أرشفة المنتج "${product.name_ar}" وإخفاؤه بنجاح نظراً لوجود مبيعات أو مشتريات سابقة مرتبطة به.`,
       };
     } else {
       // حذف نهائي كامل (Hard Delete)
       db.transaction(() => {
         if (variantIds.length > 0) {
           const placeholders = variantIds.map(() => '?').join(',');
+
+          // 1. حذف حركات المخزون التابعة للـ batches أولاً لتفادي تعارض الـ Foreign Key
+          const batchRows = db
+            .prepare(`SELECT id FROM batches WHERE variant_id IN (${placeholders})`)
+            .all(...variantIds) as { id: number }[];
+
+          if (batchRows.length > 0) {
+            const bPlaceholders = batchRows.map(() => '?').join(',');
+            db.prepare(`DELETE FROM stock_movements WHERE batch_id IN (${bPlaceholders})`).run(
+              ...batchRows.map((b) => b.id)
+            );
+          }
 
           db.prepare(`DELETE FROM product_barcodes WHERE variant_id IN (${placeholders})`).run(...variantIds);
           db.prepare(`DELETE FROM batches WHERE variant_id IN (${placeholders})`).run(...variantIds);
@@ -741,21 +831,42 @@ export class ProductsService {
     options?: ProductSearchOptions
   ): Promise<ProductWithVariants[]> {
     const db = this.getDb();
-    const q = `%${query.trim()}%`;
-    const limit = options?.limit ?? 50;
+    const limit = options?.limit ?? 500;
     const offset = ((options?.page ?? 1) - 1) * limit;
 
     const whereClauses: string[] = [];
     const params: any[] = [];
 
-    if (query.trim()) {
-      whereClauses.push(`(
-        p.name_ar LIKE ? OR 
-        p.name_en LIKE ? OR 
-        v.sku LIKE ? OR 
-        pb.barcode LIKE ?
-      )`);
-      params.push(q, q, q, q);
+    const rawQuery = query.trim();
+    if (rawQuery) {
+      // توليد أنماط البحث العربية لتغطية كافة أشكال الهمزات والياء والتاء المربوطة
+      const patterns = new Set<string>();
+      patterns.add(rawQuery);
+      patterns.add(rawQuery.replace(/[أإآ]/g, 'ا'));
+      if (rawQuery.startsWith('ا')) {
+        patterns.add('أ' + rawQuery.slice(1));
+        patterns.add('إ' + rawQuery.slice(1));
+        patterns.add('آ' + rawQuery.slice(1));
+      }
+      patterns.add(rawQuery.replace(/ة/g, 'ه'));
+      patterns.add(rawQuery.replace(/ه/g, 'ة'));
+      patterns.add(rawQuery.replace(/ى/g, 'ي'));
+      patterns.add(rawQuery.replace(/ي/g, 'ى'));
+
+      const subClauses: string[] = [];
+      for (const p of patterns) {
+        subClauses.push('p.name_ar LIKE ?');
+        params.push(`%${p}%`);
+      }
+      // البحث أيضاً في الاسم الإنجليزي والـ SKU والباركود بالاستعلام
+      subClauses.push('p.name_en LIKE ?');
+      params.push(`%${rawQuery}%`);
+      subClauses.push('v.sku LIKE ?');
+      params.push(`%${rawQuery}%`);
+      subClauses.push('pb.barcode LIKE ?');
+      params.push(`%${rawQuery}%`);
+
+      whereClauses.push(`(${subClauses.join(' OR ')})`);
     }
 
     if (options?.categoryId) {
@@ -771,6 +882,9 @@ export class ProductsService {
     if (options?.isActive !== undefined) {
       whereClauses.push('p.is_active = ?');
       params.push(options.isActive ? 1 : 0);
+    } else {
+      // إرجاع الأصناف النشطة فقط افتراضياً واستبعاد المحذوف والمؤرشف
+      whereClauses.push('p.is_active = 1');
     }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';

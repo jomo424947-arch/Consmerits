@@ -61,7 +61,7 @@ export function InventoryScreen(): React.ReactElement {
             variantName: b.variant_name,
             barcode: b.barcode || '---',
             batchNumber: b.batch_no || `BATCH-${b.id}`,
-            expiryDate: b.expiry_date || 'غير محدد',
+            expiryDate: b.expiry_date || 'بدون تاريخ صلاحية (رصيد افتتاحي)',
             qty: b.qty_remaining ?? b.quantity_remaining ?? 0,
             daysRemaining: b.days_remaining ?? (
               b.expiry_date

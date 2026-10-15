@@ -43,20 +43,15 @@ export function UsersPage(): React.ReactElement {
       const electron = (window as any).electron;
       if (electron?.listUsers) {
         const res = await electron.listUsers();
-        if (res.success && Array.isArray(res.data)) {
+        if (res?.success && Array.isArray(res.data)) {
           setUsers(res.data);
           return;
         }
       }
-
-      // قائمة نموذجية افتراضية
-      setUsers([
-        { id: 1, uuid: 'u1', username: 'owner', display_name: 'مالك المتجر', role: 'owner', is_active: 1, created_at: '2026-01-01' },
-        { id: 2, uuid: 'u2', username: 'manager1', display_name: 'أحمد محمود (مدير فرع)', role: 'manager', is_active: 1, created_at: '2026-02-15' },
-        { id: 3, uuid: 'u3', username: 'cashier1', display_name: 'سارة علي (كاشير صباحي)', role: 'cashier', is_active: 1, created_at: '2026-03-10' },
-      ]);
+      setUsers([]);
     } catch (err: any) {
       toastError(err.message || 'خطأ أثناء جلب المستخدمين');
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }

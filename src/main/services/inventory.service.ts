@@ -382,6 +382,7 @@ export class InventoryService {
    */
   public async getExpiringBatches(days: number): Promise<ExpiryAlertItem[]> {
     const db = this.getDb();
+    const includeNullExpiry = days >= 1000 ? 1 : 0;
     const sql = `
       SELECT 
         b.id as batch_id,
@@ -390,19 +391,27 @@ export class InventoryService {
         pv.name as variant_name,
         b.batch_no,
         b.expiry_date,
-        CAST(julianday(b.expiry_date) - julianday(date('now')) AS INTEGER) as days_remaining,
+        CASE 
+          WHEN b.expiry_date IS NOT NULL 
+          THEN CAST(julianday(b.expiry_date) - julianday(date('now')) AS INTEGER)
+          ELSE NULL 
+        END as days_remaining,
         b.qty_remaining,
         b.unit_cost
       FROM batches b
       JOIN product_variants pv ON b.variant_id = pv.id
       JOIN products p ON pv.product_id = p.id
-      WHERE b.expiry_date IS NOT NULL 
-        AND b.expiry_date <= date('now', '+' || ? || ' days')
-        AND b.qty_remaining > 0
-      ORDER BY b.expiry_date ASC
+      WHERE (
+        (b.expiry_date IS NOT NULL AND b.expiry_date <= date('now', '+' || ? || ' days'))
+        OR (? = 1 AND b.expiry_date IS NULL)
+      )
+      AND b.qty_remaining > 0
+      ORDER BY 
+        CASE WHEN b.expiry_date IS NULL THEN 1 ELSE 0 END ASC,
+        b.expiry_date ASC
     `;
 
-    return db.prepare(sql).all(days) as ExpiryAlertItem[];
+    return db.prepare(sql).all(days, includeNullExpiry) as ExpiryAlertItem[];
   }
 
   // ==========================================

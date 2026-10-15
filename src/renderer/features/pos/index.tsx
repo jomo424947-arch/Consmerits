@@ -9,8 +9,10 @@ import { CartTable } from './components/CartTable';
 import { ProductCatalog } from './components/ProductCatalog';
 import { PaymentModal } from './components/PaymentModal';
 import { HeldSalesModal } from './components/HeldSalesModal';
+import { InvoiceReceiptModal } from './components/InvoiceReceiptModal';
 import { usePos } from './hooks/usePos';
 import { formatMoney } from '../../../shared/utils/money';
+import { Sale } from '../../../shared/types/sales.types';
 import { sounds } from '../../lib/sounds';
 import { MESSAGES } from '../../lib/messages';
 
@@ -38,9 +40,12 @@ export function PosScreen(): React.ReactElement {
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isHeldModalOpen, setIsHeldModalOpen] = useState(false);
+  const [previewSale, setPreviewSale] = useState<Sale | null>(null);
+  const [autoPrintAfterSale, setAutoPrintAfterSale] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [customDiscountStr, setCustomDiscountStr] = useState('0');
+  const [catalogRefreshTrigger, setCatalogRefreshTrigger] = useState(0);
 
   // الاستماع لاختصارات لوحة المفاتيح المخصصة لشاشة البيع
   useEffect(() => {
@@ -148,6 +153,7 @@ export function PosScreen(): React.ReactElement {
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ProductCatalog
             onSelectProduct={handleSelectCatalogProduct}
+            refreshTrigger={catalogRefreshTrigger}
             style={{ height: '100%', minWidth: 0 }}
           />
         </div>
@@ -478,7 +484,25 @@ export function PosScreen(): React.ReactElement {
         discount={discountAmount}
         cart={cart}
         customerId={customerId}
-        onSaleComplete={clearCart}
+        onSaleComplete={(createdSale, autoPrint) => {
+          clearCart();
+          setIsPaymentOpen(false);
+          setAutoPrintAfterSale(autoPrint);
+          setPreviewSale(createdSale);
+          setCatalogRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* نافذة معاينة الفاتورة قبل الطباعة */}
+      <InvoiceReceiptModal
+        isOpen={Boolean(previewSale)}
+        onClose={() => setPreviewSale(null)}
+        sale={previewSale}
+        autoPrint={autoPrintAfterSale}
+        onNewSale={() => {
+          setPreviewSale(null);
+          clearCart();
+        }}
       />
 
       {/* نافذة الفواتير المعلقة */}

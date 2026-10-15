@@ -3,11 +3,23 @@ import { AppIcon } from '../../../components/common/AppIcon';
 import { GlassIcon } from '../../../components/common/GlassIcon';
 import { formatMoney } from '../../../../shared/utils/money';
 import { sounds } from '../../../lib/sounds';
+import { useToast } from '../../../components/common/ToastContext';
 
 export interface ProductCatalogProps {
   onSelectProduct: (product: any, variant?: any) => void;
   className?: string;
   style?: React.CSSProperties;
+  refreshTrigger?: number;
+}
+
+// تطبيع النصوص العربية لتحقيق بحث سلس ودقيق بغض النظر عن اختلاف الهمزات
+function normalizeArabic(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '');
 }
 
 // قائمة أيقونات مقترحة للتصنيفات لتبدو الواجهة فائقة الجمال مثل أنظمة نقاط البيع الحديثة
@@ -23,147 +35,35 @@ const categoryIconMap: Record<string, string> = {
   عام: 'inventory_2',
 };
 
-// أصناف تجميلية افتراضية جاهزة للعرض فوراً في حال كانت قاعدة البيانات جديدة وخالية
-const FALLBACK_STARTER_PRODUCTS = [
-  {
-    id: 101,
-    name_ar: 'سيروم فيتامين سي للتفتيح والنضارة',
-    category_name: 'العناية بالبشرة',
-    brand_name: 'The Ordinary',
-    variants: [
-      { id: 1001, name: '30ml', sale_price: 25000, total_stock: 24, barcodes: ['6221112223331'] },
-    ],
-  },
-  {
-    id: 102,
-    name_ar: 'أحمر شفاه مات مخملي طويل الثبات',
-    category_name: 'المكياج',
-    brand_name: 'Maybelline',
-    variants: [
-      { id: 1002, name: 'أحمر كلاسيكي #05', sale_price: 18000, total_stock: 30, barcodes: ['6221112223332'] },
-      { id: 1003, name: 'نود وردي #12', sale_price: 18000, total_stock: 18, barcodes: ['6221112223333'] },
-    ],
-  },
-  {
-    id: 103,
-    name_ar: 'فاونديشن تغطية كاملة ومات (SPF 20)',
-    category_name: 'المكياج',
-    brand_name: "L'Oreal Paris",
-    variants: [
-      { id: 1004, name: 'درجة عاجي 120', sale_price: 32000, total_stock: 15, barcodes: ['6221112223334'] },
-      { id: 1005, name: 'درجة بيج طبيعي 200', sale_price: 32000, total_stock: 12, barcodes: ['6221112223335'] },
-    ],
-  },
-  {
-    id: 104,
-    name_ar: 'مسكرة تكثيف ومضاعفة حجم الرموش',
-    category_name: 'المكياج',
-    brand_name: 'Essence',
-    variants: [
-      { id: 1006, name: 'أسود فحمي', sale_price: 14000, total_stock: 35, barcodes: ['6221112223336'] },
-    ],
-  },
-  {
-    id: 105,
-    name_ar: 'واقي شمس جل غير دهني SPF 50+',
-    category_name: 'العناية بالبشرة',
-    brand_name: 'La Roche-Posay',
-    variants: [
-      { id: 1007, name: '50ml', sale_price: 42000, total_stock: 16, barcodes: ['6221112223337'] },
-    ],
-  },
-  {
-    id: 106,
-    name_ar: 'كريم مرطب يومي بحمض الهيالورونيك',
-    category_name: 'العناية بالبشرة',
-    brand_name: 'CeraVe',
-    variants: [
-      { id: 1008, name: '177ml', sale_price: 29000, total_stock: 22, barcodes: ['6221112223338'] },
-    ],
-  },
-  {
-    id: 107,
-    name_ar: 'عطر مسك أبيض فاخر مركز (EDP)',
-    category_name: 'العطور',
-    brand_name: 'Arabian Oud',
-    variants: [
-      { id: 1009, name: '50ml', sale_price: 55000, total_stock: 10, barcodes: ['6221112223339'] },
-    ],
-  },
-  {
-    id: 108,
-    name_ar: 'زيت الأرغان المعالج للشعر التالف',
-    category_name: 'العناية بالشعر',
-    brand_name: 'OGX Beauty',
-    variants: [
-      { id: 1010, name: '100ml', sale_price: 23000, total_stock: 18, barcodes: ['6221112223340'] },
-    ],
-  },
-  {
-    id: 109,
-    name_ar: 'شامبو مغذي للشعر بالكيراتين وزيت الخروع',
-    category_name: 'العناية بالشعر',
-    brand_name: 'Garnier',
-    variants: [
-      { id: 1011, name: '400ml', sale_price: 12500, total_stock: 28, barcodes: ['6221112223341'] },
-    ],
-  },
-  {
-    id: 110,
-    name_ar: 'غسول رغوي منظف للبشرة المختلطة والدهنية',
-    category_name: 'العناية بالبشرة',
-    brand_name: 'Bioderma',
-    variants: [
-      { id: 1012, name: '200ml', sale_price: 31000, total_stock: 14, barcodes: ['6221112223342'] },
-    ],
-  },
-  {
-    id: 111,
-    name_ar: 'مجموعة فرش مكياج احترافية متكاملة 12 قطعة',
-    category_name: 'أدوات وإكسسوارات',
-    brand_name: 'Real Techniques',
-    variants: [
-      { id: 1013, name: 'طقم كامل', sale_price: 38000, total_stock: 8, barcodes: ['6221112223343'] },
-    ],
-  },
-  {
-    id: 112,
-    name_ar: 'لوشن ترطيب عميق للجسم بزبدة الشيا النقية',
-    category_name: 'العناية بالجسم',
-    brand_name: 'Vaseline',
-    variants: [
-      { id: 1014, name: '400ml', sale_price: 16500, total_stock: 20, barcodes: ['6221112223344'] },
-    ],
-  },
-];
-
 export function ProductCatalog({
   onSelectProduct,
   className = '',
   style = {},
+  refreshTrigger,
 }: ProductCatalogProps): React.ReactElement {
+  const { warning: toastWarning } = useToast();
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
   const [variantModalProduct, setVariantModalProduct] = useState<any | null>(null);
 
-  // تحميل المنتجات من قاعدة البيانات مع الفولباك التلقائي
+  // تحميل المنتجات الحقيقية المسجلة من قاعدة البيانات
   const fetchCatalog = async () => {
     setIsLoading(true);
     try {
       const electron = (window as any).electron;
       if (electron?.searchProducts) {
-        const res = await electron.searchProducts('');
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-          setProducts(res.data);
+        const res = await electron.searchProducts('', { isActive: true, limit: 1000 });
+        if (res?.success && Array.isArray(res.data)) {
+          const activeOnly = res.data.filter((p: any) => p.is_active !== 0);
+          setProducts(activeOnly);
           return;
         }
       }
-      // في حال كانت قاعدة البيانات فارغة بعد التهيئة
-      setProducts(FALLBACK_STARTER_PRODUCTS);
+      setProducts([]);
     } catch {
-      setProducts(FALLBACK_STARTER_PRODUCTS);
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -171,7 +71,7 @@ export function ProductCatalog({
 
   useEffect(() => {
     fetchCatalog();
-  }, []);
+  }, [refreshTrigger]);
 
   // استخراج قائمة التصنيفات الفريدة مع حساب عدد المنتجات في كل تصنيف
   const categoriesWithCounts = useMemo(() => {
@@ -183,20 +83,33 @@ export function ProductCatalog({
     return Object.entries(counts);
   }, [products]);
 
-  // تصفية المنتجات حسب التصنيف وعبارة البحث
+  // تصفية المنتجات حسب التصنيف وعبارة البحث (مع دعم الباركود والـ SKU وتطبيع الحروف)
   const filteredProducts = useMemo(() => {
+    const qNorm = normalizeArabic(searchQuery.trim());
     return products.filter((p) => {
       const name = p.name_ar || p.name || '';
       const brand = p.brand_name || p.brand || '';
       const cat = p.category_name || p.category || 'عام';
 
       const matchCat = selectedCategory === 'الكل' || cat === selectedCategory;
-      const matchSearch =
-        !searchQuery.trim() ||
-        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        brand.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchCat) return false;
 
-      return matchCat && matchSearch;
+      if (!qNorm) return true;
+
+      const nameNorm = normalizeArabic(name);
+      const brandNorm = normalizeArabic(brand);
+
+      if (nameNorm.includes(qNorm) || brandNorm.includes(qNorm)) {
+        return true;
+      }
+
+      // مطابقة الباركود أو الـ SKU المباشر
+      const hasBarcodeOrSku = p.variants?.some((v: any) =>
+        v.barcodes?.some((b: string) => b.toLowerCase().includes(searchQuery.trim().toLowerCase())) ||
+        (v.sku && v.sku.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+      );
+
+      return Boolean(hasBarcodeOrSku);
     });
   }, [products, selectedCategory, searchQuery]);
 
@@ -393,7 +306,42 @@ export function ProductCatalog({
           padding: '2px 4px 6px',
         }}
       >
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              gap: 12,
+              color: 'var(--text-muted)',
+              padding: 40,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 112, 136, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 4,
+              }}
+            >
+              <AppIcon name="inventory_2" size={30} color="var(--color-primary)" />
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>
+              قاعدة البيانات نظيفة وجاهزة للبدء
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
+              لا توجد منتجات مسجلة في المتجر حالياً. يمكنك البدء بإضافة منتجاتك وأسعارك من شاشة المنتجات والباركود.
+            </div>
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div
             style={{
               display: 'flex',
@@ -446,7 +394,14 @@ export function ProductCatalog({
               return (
                 <div
                   key={product.id}
-                  onClick={() => !isOutOfStock && handleProductClick(product)}
+                  onClick={() => {
+                    if (isOutOfStock) {
+                      sounds.playWarning();
+                      toastWarning(`المنتج "${product.name_ar || product.name}" غير متوفر بالمخزون حالياً (الرصيد: 0)`);
+                    } else {
+                      handleProductClick(product);
+                    }
+                  }}
                   className="glass-card"
                   style={{
                     backgroundColor: isOutOfStock ? '#FAFBF9' : '#FFFFFF',
@@ -457,7 +412,7 @@ export function ProductCatalog({
                     justifyContent: 'space-between',
                     border: '1px solid var(--border-light)',
                     cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                    opacity: isOutOfStock ? 0.6 : 1,
+                    opacity: isOutOfStock ? 0.65 : 1,
                     transition: 'all 0.16s ease',
                     position: 'relative',
                     overflow: 'hidden',

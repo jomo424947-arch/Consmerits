@@ -14,21 +14,23 @@ export function useProducts() {
     try {
       const electron = (window as any).electron;
       if (electron?.searchProducts) {
-        const res = await electron.searchProducts(query);
+        const res = await electron.searchProducts(query, { isActive: true });
         if (res?.success && Array.isArray(res.data)) {
-          const mapped: ProductItemRow[] = res.data.map((p: any) => ({
-            id: p.id,
-            name: p.name_ar,
-            category: p.category_name || 'عام',
-            brand: p.brand_name || 'بدون علامة',
-            variantsCount: p.variants?.length || 1,
-            totalStock: p.variants?.reduce((sum: number, v: any) => sum + (v.total_stock || 0), 0) || 0,
-            unit: p.unit || 'قطعة',
-            primaryBarcode: p.variants?.[0]?.barcodes?.[0] || '---',
-            price: p.variants?.[0]?.sale_price || 0,
-            variantId: p.variants?.[0]?.id,
-            isActive: p.is_active ?? 1,
-          }));
+          const mapped: ProductItemRow[] = res.data
+            .filter((p: any) => p.is_active !== 0)
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name_ar,
+              category: p.category_name || 'عام',
+              brand: p.brand_name || 'بدون علامة',
+              variantsCount: p.variants?.length || 1,
+              totalStock: p.variants?.reduce((sum: number, v: any) => sum + (v.total_stock || 0), 0) || 0,
+              unit: p.unit || 'قطعة',
+              primaryBarcode: p.variants?.[0]?.barcodes?.[0] || '---',
+              price: p.variants?.[0]?.sale_price || 0,
+              variantId: p.variants?.[0]?.id,
+              isActive: p.is_active ?? 1,
+            }));
           setProducts(mapped);
           return;
         }

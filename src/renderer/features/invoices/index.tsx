@@ -17,12 +17,13 @@ import {
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Modal } from '../../components/common/Modal';
-import { GlassIcon } from '../../components/common/GlassIcon';
 import { EmptyState } from '../../components/common/EmptyState';
+import { InvoiceReceiptModal } from '../pos/components/InvoiceReceiptModal';
 import { formatMoney } from '../../../shared/utils/money';
 import { Sale } from '../../../shared/types/sales.types';
 import { sounds } from '../../lib/sounds';
 import { useToast } from '../../components/common/ToastContext';
+import { formatDateArabic, formatTimeArabic } from '../../lib/formatters';
 
 export function InvoicesScreen(): React.ReactElement {
   const { success: toastSuccess, error: toastError } = useToast();
@@ -324,8 +325,23 @@ export function InvoicesScreen(): React.ReactElement {
                         </span>
                       </td>
 
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-muted)' }}>
-                        {s.created_at}
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-brand-deep)' }}>
+                            {formatDateArabic(s.created_at)}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: 'var(--text-muted)',
+                              direction: 'ltr',
+                              textAlign: 'right',
+                              fontFamily: 'Space Grotesk, sans-serif',
+                            }}
+                          >
+                            {formatTimeArabic(s.created_at)}
+                          </span>
+                        </div>
                       </td>
 
                       <td style={{ padding: '12px 14px' }}>
@@ -383,124 +399,12 @@ export function InvoicesScreen(): React.ReactElement {
         )}
       </div>
 
-      {/* نافذة عرض تفاصيل الفاتورة */}
-      {selectedSale && (
-        <Modal
-          isOpen={Boolean(selectedSale)}
-          onClose={() => setSelectedSale(null)}
-          title={`تفاصيل الفاتورة: #${selectedSale.invoice_no}`}
-          icon={<GlassIcon icon={FileText} size="sm" variant="brand" />}
-          width={600}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, direction: 'rtl' }}>
-            {/* معلومات رأس الفاتورة */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 12,
-                backgroundColor: '#FAFBF9',
-                padding: '12px 16px',
-                borderRadius: 10,
-                border: '1px solid var(--border-light)',
-                fontSize: 13,
-              }}
-            >
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>رقم الفاتورة: </span>
-                <strong style={{ fontFamily: 'monospace' }}>{selectedSale.invoice_no}</strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>التاريخ: </span>
-                <strong>{selectedSale.created_at}</strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>طريقة السداد: </span>
-                {getMethodBadge(selectedSale)}
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>الحالة: </span>
-                <strong>{selectedSale.status === 'completed' ? 'مكتملة ومسددة' : 'ملغاة'}</strong>
-              </div>
-            </div>
-
-            {/* جدول بنود الفاتورة */}
-            <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 8 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#F0F3F1' }}>
-                    <th style={{ padding: '8px 12px' }}>الصنف</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>الكمية</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>سعر الوحدة</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedSale.items?.map((it, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>
-                        {it.product_name}
-                        {it.variant_name &&
-                          !['الافتراضي', 'افتراضي', 'default'].includes(it.variant_name.trim().toLowerCase()) && (
-                            <span style={{ fontSize: 11, color: '#666', marginRight: 4 }}>
-                              ({it.variant_name})
-                            </span>
-                          )}
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
-                        {it.qty}
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'left' }}>
-                        {formatMoney(it.unit_price)}
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700 }}>
-                        {formatMoney(it.line_total)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* الإجماليات */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                backgroundColor: '#EDF8F1',
-                borderRadius: 10,
-                border: '1px solid #B8E2C8',
-              }}
-            >
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#21633D' }}>الإجمالي النهائي للفاتورة:</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#21633D' }}>
-                {formatMoney(selectedSale.total)}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-              <Button
-                variant="primary"
-                onClick={() => handlePrintReceipt(selectedSale)}
-                style={{ height: 40 }}
-              >
-                <Printer size={15} />
-                <span>طباعة الإيصال الحراري</span>
-              </Button>
-
-              <Button
-                variant="secondary"
-                onClick={() => setSelectedSale(null)}
-                style={{ height: 40, width: 90 }}
-              >
-                إغلاق
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* نافذة عرض ومعاينة الفاتورة قبل الطباعة */}
+      <InvoiceReceiptModal
+        isOpen={Boolean(selectedSale)}
+        onClose={() => setSelectedSale(null)}
+        sale={selectedSale}
+      />
     </div>
   );
 }

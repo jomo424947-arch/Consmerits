@@ -26,7 +26,7 @@ interface PaymentModalProps {
   discount: number;
   cart: CartLineItem[];
   customerId?: number | null;
-  onSaleComplete: () => void;
+  onSaleComplete: (sale: any, autoPrint: boolean) => void;
 }
 
 type PaymentMethodType = 'cash' | 'card' | 'split';
@@ -164,7 +164,7 @@ export function PaymentModal({
         sounds.playSaleSuccess();
         sounds.playCashRegister();
         toastSuccess(MESSAGES.SALE_SUCCESS);
-        onSaleComplete();
+        onSaleComplete(res.data, printReceipt);
         onClose();
       } else {
         const errorMsg = res?.error?.message || res?.error || MESSAGES.UNEXPECTED_ERROR;
@@ -460,8 +460,8 @@ export function PaymentModal({
               gap: 8,
             }}
           >
-            <AppIcon name="check_circle" size={19} />
-            <span>تأكيد وطباعة الفاتورة</span>
+            <AppIcon name="receipt" size={19} />
+            <span>تأكيد البيع ومعاينة الفاتورة</span>
           </Button>
 
           <Button

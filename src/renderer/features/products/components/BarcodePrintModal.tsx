@@ -4,8 +4,10 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  Zap,
   Sliders,
   Layers,
+  ChevronDown,
 } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { Modal } from '../../../components/common/Modal';
@@ -52,16 +54,17 @@ export function BarcodePrintModal({
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const [copies, setCopies] = useState('1');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isTestPrinting, setIsTestPrinting] = useState(false);
   const [isClearingQueue, setIsClearingQueue] = useState(false);
+  const [isRefreshingPrinters, setIsRefreshingPrinters] = useState(false);
   const [printers, setPrinters] = useState<SystemPrinter[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [selectedSizeId, setSelectedSizeId] = useState<string>('38x25');
   const [storeName, setStoreName] = useState<string>('بوتيك جوري');
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const previewSvgRef = useRef<SVGSVGElement | null>(null);
 
-  // جلب الطابعات وإعدادات المتجر عند فتح المودال
+  // جلب الطابعات وإعدادات المتجر عند فتح المودال مع اختيار الطابعة النشطة تلقائياً
   useEffect(() => {
     if (!isOpen) return;
 
@@ -72,13 +75,15 @@ export function BarcodePrintModal({
         const electron = (window as any).electron;
         if (!electron) return;
 
-        // جلب الإعدادات
+        let savedPrinter = '';
+
+        // 1. جلب الإعدادات المحفوظة
         if (electron.getSettings) {
           const sRes = await electron.getSettings();
           if (mounted && sRes?.success && sRes.data) {
             if (sRes.data.store_name) setStoreName(sRes.data.store_name);
             if (sRes.data.barcode_printer_name) {
-              setSelectedPrinter(sRes.data.barcode_printer_name);
+              savedPrinter = sRes.data.barcode_printer_name;
             }
             if (sRes.data.barcode_label_size) {
               setSelectedSizeId(sRes.data.barcode_label_size);
@@ -86,25 +91,39 @@ export function BarcodePrintModal({
           }
         }
 
-        // جلب الطابعات
+        // 2. جلب قائمة طابعات النظام مع حالة الاتصال الحقيقية
         if (electron.getSystemPrinters) {
           const res = await electron.getSystemPrinters();
           if (mounted && res?.success && Array.isArray(res.data)) {
             setPrinters(res.data);
 
-            // إذا لم تكن هناك طابعة محددة بعد، نختار تلقائياً أفضل طابعة حرارية
-            if (!selectedPrinter) {
-              const bestThermal = res.data.find(
+            const savedExists = res.data.find(
+              (p: SystemPrinter) => p.name.toLowerCase() === savedPrinter.toLowerCase()
+            );
+            const savedIsOnline = savedExists && savedExists.status === 0;
+
+            if (savedIsOnline) {
+              setSelectedPrinter(savedExists.name);
+            } else {
+              // إذا كانت الطابعة المحفوظة غير متصلة أو فارغة، نختار الطابعة الحرارية المتصلة تلقائياً
+              const onlineThermals = res.data.filter(
                 (p: SystemPrinter) => p.isThermalRecommended && p.status === 0
               );
-              const anyThermal = res.data.find(
-                (p: SystemPrinter) => p.isThermalRecommended
-              );
-              const defaultP = res.data.find((p: SystemPrinter) => p.isDefault);
+              const bestThermalOnline =
+                onlineThermals.find((p: SystemPrinter) => p.isDefault) ||
+                onlineThermals[0] ||
+                res.data.find((p: SystemPrinter) => p.isDefault && p.status === 0) ||
+                res.data.find((p: SystemPrinter) => p.status === 0);
 
-              const chosen =
-                bestThermal?.name || anyThermal?.name || defaultP?.name || (res.data[0]?.name ?? '');
+              const chosen = bestThermalOnline?.name || savedPrinter || (res.data[0]?.name ?? '');
               setSelectedPrinter(chosen);
+
+              // حفظ الطابعة النشطة تلقائياً إن كانت مختلفة
+              if (bestThermalOnline && bestThermalOnline.name !== savedPrinter && electron.updateSettings) {
+                electron.updateSettings([
+                  { key: 'barcode_printer_name', value: bestThermalOnline.name },
+                ]);
+              }
             }
           }
         }
@@ -158,7 +177,15 @@ export function BarcodePrintModal({
 
   const currentSize =
     LABEL_SIZES.find((s) => s.id === selectedSizeId) || LABEL_SIZES[0];
-  const activePrinterInfo = printers.find((p) => p.name === selectedPrinter);
+  const activePrinterInfo = printers.find(
+    (p) => p.name.toLowerCase() === (selectedPrinter || '').toLowerCase()
+  );
+  const isSelectedOnline = activePrinterInfo?.status === 0;
+
+  // البحث عن أي طابعة حرارية أخرى متصلة إن كانت الحالية غير متصلة
+  const alternativeOnlinePrinter = printers.find(
+    (p) => p.name.toLowerCase() !== (selectedPrinter || '').toLowerCase() && p.status === 0
+  );
 
   const handlePrinterChange = async (printerName: string) => {
     setSelectedPrinter(printerName);
@@ -191,6 +218,25 @@ export function BarcodePrintModal({
     }
   };
 
+  // تحديث قائمة الطابعات وحالتها
+  const handleRefreshPrinters = async () => {
+    setIsRefreshingPrinters(true);
+    try {
+      const electron = (window as any).electron;
+      if (electron?.getSystemPrinters) {
+        const res = await electron.getSystemPrinters();
+        if (res?.success && Array.isArray(res.data)) {
+          setPrinters(res.data);
+          toastSuccess('تم تحديث قائمة الطابعات وفحص الاتصال بنجاح');
+        }
+      }
+    } catch (err: any) {
+      toastError('تعذر تحديث قائمة الطابعات');
+    } finally {
+      setIsRefreshingPrinters(false);
+    }
+  };
+
   // تفريغ قائمة الطباعة وإلغاء التعليق
   const handleClearQueue = async () => {
     setIsClearingQueue(true);
@@ -202,7 +248,7 @@ export function BarcodePrintModal({
           sounds.playSaleSuccess();
           toastSuccess('تم تفريغ قائمة الطباعة وإلغاء الأوامر العالقة بنجاح');
 
-          // تحديث قائمة الطابعات
+          // تحديث قائمة الطابعات بعد فك التعليق
           if (electron.getSystemPrinters) {
             const pRes = await electron.getSystemPrinters();
             if (pRes?.success && Array.isArray(pRes.data)) {
@@ -220,6 +266,45 @@ export function BarcodePrintModal({
     }
   };
 
+  // طباعة ملصق تجريبي واحد
+  const handleTestPrint = async () => {
+    setIsTestPrinting(true);
+    try {
+      const electron = (window as any).electron;
+      const labels = [
+        {
+          productName,
+          variantName,
+          priceFormatted,
+          barcode,
+          copiesCount: 1,
+        },
+      ];
+
+      const options = {
+        printerName: selectedPrinter || undefined,
+        labelWidthMm: currentSize.width,
+        labelHeightMm: currentSize.height,
+      };
+
+      if (electron?.printBarcodeLabels) {
+        const res = await electron.printBarcodeLabels(labels, options);
+        if (!res?.success) {
+          throw new Error(res?.error || 'فشلت طباعة الملصق التجريبي');
+        }
+      }
+
+      sounds.playSaleSuccess();
+      toastSuccess(`تمت طباعة ملصق تجريبي بنجاح على (${selectedPrinter || 'الطابعة'})`);
+    } catch (err: any) {
+      sounds.playError();
+      toastError(err.message || 'تعذر إتمام طباعة الملصق التجريبي');
+    } finally {
+      setIsTestPrinting(false);
+    }
+  };
+
+  // طباعة عدد الملصقات المطلوب
   const handlePrint = async (e: React.FormEvent) => {
     e.preventDefault();
     const count = parseInt(copies, 10);
@@ -272,180 +357,181 @@ export function BarcodePrintModal({
       onClose={onClose}
       title="طباعة ملصقات الباركود للمنتج"
       icon={<GlassIcon icon={Printer} size="sm" variant="primary" />}
-      width={500}
+      width={520}
     >
       <form onSubmit={handlePrint} style={{ display: 'flex', flexDirection: 'column', gap: 14, direction: 'rtl' }}>
         
-        {/* شريط حالة الطابعة المحددة */}
+        {/* اختيار الطابعة وحالتها المباشرة (ظاهرة دائماً وواضحة) */}
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 14px',
+            padding: '12px 14px',
             borderRadius: 10,
-            backgroundColor: '#F7FAF8',
-            border: '1px solid #D5E2DA',
+            backgroundColor: isSelectedOnline ? '#F5FAF7' : '#FEF2F2',
+            border: isSelectedOnline ? '1px solid #CDE5D8' : '1px solid #FECACA',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                backgroundColor:
-                  activePrinterInfo?.status === 0 ? '#10B981' : '#EF4444',
-                boxShadow:
-                  activePrinterInfo?.status === 0
-                    ? '0 0 8px rgba(16, 185, 129, 0.6)'
-                    : '0 0 8px rgba(239, 68, 68, 0.6)',
-              }}
-            />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1B2B24' }}>
-                الطابعة:{' '}
-                <span style={{ color: 'var(--color-brand-deep)' }}>
-                  {selectedPrinter || 'الطابعة الافتراضية للويندوز'}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: '#666', marginTop: 1 }}>
-                {activePrinterInfo?.status === 0
-                  ? '🟢 متصلة وجاهزة للطباعة الفورية'
-                  : '🔴 الطابعة غير متصلة أو بها مهام معلقة'}
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <label style={{ fontSize: 13, fontWeight: 700, color: '#1B2B24', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Printer size={15} style={{ color: isSelectedOnline ? '#059669' : '#DC2626' }} />
+              <span>طابعة الباركود المحددة:</span>
+            </label>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={handleRefreshPrinters}
+                disabled={isRefreshingPrinters}
+                title="تحديث قائمة الطابعات وفحص الاتصال"
+                style={{
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #CCD8D1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#2C4A3E',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <RefreshCw size={11} className={isRefreshingPrinters ? 'spin-animation' : ''} />
+                <span>تحديث</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearQueue}
+                disabled={isClearingQueue}
+                title="تفريغ مهام الطباعة المعلقة وفك تعليق الطابعة"
+                style={{
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #CCD8D1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#B91C1C',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Zap size={11} className={isClearingQueue ? 'spin-animation' : ''} />
+                <span>فك التعليق</span>
+              </button>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              type="button"
-              onClick={handleClearQueue}
-              disabled={isClearingQueue}
-              title="تفريغ مهام الطباعة المعلقة وفك تعليق الطابعة"
-              style={{
-                padding: '6px 10px',
-                borderRadius: 6,
-                border: '1px solid #C4D3CB',
-                backgroundColor: '#FFFFFF',
-                color: '#2C4A3E',
-                fontSize: 11.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <RefreshCw size={12} className={isClearingQueue ? 'spin-animation' : ''} />
-              <span>فك التعليق</span>
-            </button>
+          {/* قائمة اختيار الطابعة */}
+          <select
+            value={selectedPrinter}
+            onChange={(e) => handlePrinterChange(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              borderRadius: 7,
+              border: isSelectedOnline ? '1.5px solid #10B981' : '1.5px solid #EF4444',
+              backgroundColor: '#FFFFFF',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#1B2B24',
+              direction: 'ltr',
+              textAlign: 'right',
+            }}
+          >
+            {printers.length === 0 ? (
+              <option value="">لا توجد طابعات مكتشفة في الويندوز</option>
+            ) : (
+              printers.map((p) => {
+                const online = p.status === 0;
+                return (
+                  <option key={p.name} value={p.name}>
+                    {online ? '🟢 متصلة: ' : '🔴 غير متصلة: '}
+                    {p.name} {p.isThermalRecommended ? '⭐ (طابعة ملصقات)' : ''}
+                    {p.isDefault ? ' [الافتراضية]' : ''}
+                  </option>
+                );
+              })
+            )}
+          </select>
 
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 6,
-                border: '1px solid #C4D3CB',
-                backgroundColor: showAdvanced ? 'var(--color-primary-light)' : '#FFFFFF',
-                color: 'var(--color-brand-deep)',
-                fontSize: 11.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <Sliders size={12} />
-              <span>{showAdvanced ? 'إخفاء الإعدادات' : 'تغيير الطابعة'}</span>
-            </button>
+          {/* سطر الحالة والتنبيه الذكي */}
+          <div style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {isSelectedOnline ? (
+              <span style={{ color: '#047857', fontWeight: 600 }}>
+                🟢 الطابعة متصلة وجاهزة للطباعة الحرارية المباشرة
+              </span>
+            ) : (
+              <span style={{ color: '#B91C1C', fontWeight: 700 }}>
+                🔴 هذه الطابعة غير متصلة حالياً (Offline)
+              </span>
+            )}
+
+            {/* إذا كانت الطابعة الحالية غير متصلة ويوجد طابعة متصلة، زر تبديل سريع بنقرة واحدة */}
+            {!isSelectedOnline && alternativeOnlinePrinter && (
+              <button
+                type="button"
+                onClick={() => handlePrinterChange(alternativeOnlinePrinter.name)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 5,
+                  backgroundColor: '#059669',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                التبديل إلى: {alternativeOnlinePrinter.name} 🟢
+              </button>
+            )}
           </div>
         </div>
 
-        {/* إعدادات متقدمة لاختيار الطابعة ومقاس الملصق */}
-        {showAdvanced && (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              backgroundColor: '#F3F6F4',
-              border: '1px solid #D1DED6',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}
-          >
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                اختيار طابعة الباركود:
-              </label>
-              <select
-                value={selectedPrinter}
-                onChange={(e) => handlePrinterChange(e.target.value)}
+        {/* مقاس ورق الملصق */}
+        <div>
+          <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: '#1B2B24' }}>
+            مقاس ورق الملصق (Label Size):
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {LABEL_SIZES.map((size) => (
+              <button
+                key={size.id}
+                type="button"
+                onClick={() => handleSizeChange(size.id)}
                 style={{
-                  width: '100%',
-                  padding: '8px 10px',
+                  padding: '6px 11px',
                   borderRadius: 6,
-                  border: '1px solid #B7C9C0',
-                  backgroundColor: '#FFFFFF',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  direction: 'ltr',
-                  textAlign: 'right',
+                  border:
+                    selectedSizeId === size.id
+                      ? '1.5px solid var(--color-brand-deep)'
+                      : '1px solid #CCD8D1',
+                  backgroundColor:
+                    selectedSizeId === size.id ? 'var(--color-primary-light)' : '#FFFFFF',
+                  color:
+                    selectedSizeId === size.id ? 'var(--color-brand-deep)' : '#444',
+                  fontSize: 11.5,
+                  fontWeight: selectedSizeId === size.id ? 700 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {printers.length === 0 ? (
-                  <option value="">لا توجد طابعات مكتشفة (سيتم استخدام الافتراضية)</option>
-                ) : (
-                  printers.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.name} {p.isThermalRecommended ? '⭐ (طابعة ملصقات)' : ''}{' '}
-                      {p.isDefault ? '(الافتراضية)' : ''}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                مقاس ورق الملصق (Label Size):
-              </label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {LABEL_SIZES.map((size) => (
-                  <button
-                    key={size.id}
-                    type="button"
-                    onClick={() => handleSizeChange(size.id)}
-                    style={{
-                      padding: '5px 10px',
-                      borderRadius: 6,
-                      border:
-                        selectedSizeId === size.id
-                          ? '1.5px solid var(--color-brand-deep)'
-                          : '1px solid #CCD8D1',
-                      backgroundColor:
-                        selectedSizeId === size.id ? 'var(--color-primary-light)' : '#FFFFFF',
-                      color:
-                        selectedSizeId === size.id ? 'var(--color-brand-deep)' : '#444',
-                      fontSize: 11.5,
-                      fontWeight: selectedSizeId === size.id ? 700 : 500,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {size.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                {size.label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* معاينة شكل ملصق الباركود الحراري الحقيقي */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 6 }}>
             معاينة ملصق الباركود المباشر ({currentSize.width} × {currentSize.height} مم)
           </div>
 
@@ -606,23 +692,50 @@ export function BarcodePrintModal({
           </div>
         </div>
 
-        {/* أزرار الإجراءات */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+        {/* أزرار الإجراءات مع زر طباعة ملصق تجريبي */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          {/* زر طباعة ملصق تجريبي (1) للتأكد السريع */}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleTestPrint}
+            isLoading={isTestPrinting}
+            disabled={isPrinting}
+            title="طباعة ملصق واحد فقط للتأكد من المقاس وجودة الطباعة"
+            style={{
+              height: 46,
+              fontSize: 13,
+              fontWeight: 700,
+              backgroundColor: '#F3F4F6',
+              border: '1px solid #D1D5DB',
+              color: '#374151',
+              whiteSpace: 'nowrap',
+              padding: '0 12px',
+            }}
+          >
+            <Printer size={15} />
+            <span>تجربة ملصق (1)</span>
+          </Button>
+
+          {/* زر الطباعة الرئيسي لعدد النسخ */}
           <Button
             type="submit"
             variant="primary"
             isLoading={isPrinting}
+            disabled={isTestPrinting}
             style={{ flex: 1, height: 46, fontSize: 14.5, fontWeight: 700 }}
           >
             <Printer size={17} />
-            <span>{isPrinting ? 'جارٍ إرسال أمر الطباعة...' : 'طباعة الملصقات الآن'}</span>
+            <span>
+              {isPrinting ? 'جارٍ إرسال أمر الطباعة...' : `طباعة الملصقات الآن (${copies})`}
+            </span>
           </Button>
 
           <Button
             type="button"
             variant="secondary"
             onClick={onClose}
-            style={{ width: 90, height: 46 }}
+            style={{ width: 80, height: 46 }}
           >
             إلغاء
           </Button>

@@ -18,6 +18,7 @@ export interface ReceiptConfig {
   footer: string;
   widthMm: number;
   currency: string;
+  logoDataUrl?: string;
 }
 
 // أنماط باركود Code128 (المعيار الدولي لطباعة الباركود في الإيصالات)
@@ -72,7 +73,14 @@ function generateCode128Svg(text: string, height: number = 38): string {
  */
 function formatReceiptDate(dateStr: string): string {
   try {
-    const d = new Date(dateStr.replace(' ', 'T'));
+    const s = dateStr.trim();
+    let d: Date;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) {
+      d = new Date(s.replace(' ', 'T') + 'Z');
+      if (isNaN(d.getTime())) d = new Date(s.replace(' ', 'T'));
+    } else {
+      d = new Date(s);
+    }
     if (isNaN(d.getTime())) return dateStr;
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -128,15 +136,41 @@ export class ReceiptPrinter {
     const map = new Map<string, string>();
     rows.forEach((r) => map.set(r.key, r.value));
 
+    // استخراج الشعار كـ base64 data url إن وُجد
+    let logoDataUrl = '';
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const path = require('path');
+      const customPath = map.get('store_logo_path');
+      const candidates = [
+        customPath,
+        path.join(process.cwd(), 'public', 'logo.png'),
+        path.join(__dirname, '../../public/logo.png'),
+        path.join(__dirname, '../../../public/logo.png'),
+        path.join(__dirname, '../public/logo.png'),
+      ].filter(Boolean);
+
+      for (const p of candidates) {
+        if (p && fs.existsSync(p)) {
+          const ext = path.extname(p).replace('.', '') || 'png';
+          logoDataUrl = `data:image/${ext};base64,${fs.readFileSync(p).toString('base64')}`;
+          break;
+        }
+      }
+    } catch {}
+
     return {
-      storeName: map.get('store_name') ?? 'بوتيك جوري (Boutique Gouri)',
-      storePhone: map.get('store_phone') ?? '',
-      storeAddress: map.get('store_address') ?? '',
-      taxNumber: map.get('tax_number') ?? '',
-      header: map.get('receipt_header') ?? 'أهلاً بكم في متجرنا',
-      footer: map.get('receipt_footer') ?? 'شكراً لزيارتكم ونسعد بخدمتكم دائماً',
-      widthMm: parseInt(map.get('receipt_width_mm') ?? '80', 10),
-      currency: map.get('currency') ?? 'ج.م',
+      storeName: map.get('store_name') || 'بوتيك جوري (Boutique Gouri)',
+      storePhone: map.get('store_phone') || map.get('store_whatsapp') || '',
+      storeAddress: map.get('store_address') || '',
+      taxNumber: map.get('tax_registration_no') || map.get('tax_number') || '',
+      header: map.get('receipt_header') || 'أهلاً بكم في متجرنا',
+      footer: map.get('receipt_footer') || 'شكراً لزيارتكم ونسعد بخدمتكم دائماً',
+      widthMm: parseInt(map.get('receipt_width_mm') || '80', 10),
+      currency: map.get('currency_symbol') || map.get('currency') || 'ج.م',
+      logoDataUrl,
     };
   }
 
@@ -485,6 +519,7 @@ export class ReceiptPrinter {
       <body>
         <!-- 1. ترويسة المتجر -->
         <div class="header">
+          ${cfg.logoDataUrl ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${cfg.logoDataUrl}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover; border: 1.5px solid #FF95A5;" /></div>` : ''}
           <div class="store-name">${cfg.storeName}</div>
           ${cfg.storeAddress ? `<div class="store-info">📍 ${cfg.storeAddress}</div>` : ''}
           ${cfg.storePhone ? `<div class="store-info"><span>هاتف:</span> <span class="ltr-text" style="font-weight: 700;">${cfg.storePhone}</span></div>` : ''}
@@ -634,42 +669,66 @@ export class ReceiptPrinter {
 
       await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 
-      // انتظار اكتمال تحميل وتنسيق الصفحة
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // انتظار قصير لتجهيز وتصيير الصفحة
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
       const widthMicrons = (config.widthMm || 80) * 1000;
 
+      // قراءة اسم الطابعة المحددة من الإعدادات إن وُجدت
+      let printerName: string | undefined;
+      try {
+        const pSetting = this.getDb()
+          .prepare("SELECT value FROM settings WHERE key = 'printer_name'")
+          .get() as { value?: string } | undefined;
+        if (pSetting?.value && pSetting.value.trim()) {
+          printerName = pSetting.value.trim();
+        }
+      } catch {}
+
+      const printOptions: any = {
+        silent: true,
+        printBackground: true,
+        margins: { marginType: 'none' },
+        pageSize: {
+          width: widthMicrons,
+          height: 297000,
+        },
+      };
+
+      if (printerName) {
+        printOptions.deviceName = printerName;
+      }
+
       return new Promise<boolean>((resolve) => {
-        printWindow.webContents.print(
-          {
-            silent: true,
-            printBackground: true,
-            margins: { marginType: 'none' },
-            pageSize: {
-              width: widthMicrons,
-              height: 297000,
-            },
-          },
-          (success: boolean, failureReason: string) => {
-            if (!success) {
-              console.warn('Silent receipt print fallback, reason:', failureReason);
-              printWindow.webContents.print(
-                { silent: false, printBackground: true },
-                (fallbackSuccess: boolean) => {
-                  printWindow.close();
-                  resolve(fallbackSuccess);
-                }
-              );
-              return;
+        let isDone = false;
+        const cleanup = (result: boolean) => {
+          if (isDone) return;
+          isDone = true;
+          try {
+            if (!printWindow.isDestroyed()) {
+              printWindow.close();
             }
-            printWindow.close();
-            resolve(success);
+          } catch {}
+          resolve(result);
+        };
+
+        // مؤقت أمان يمنع تعليق الشاشة إطلاقاً (أقصى مهلة 3.5 ثانية)
+        const timer = setTimeout(() => {
+          console.warn('تنبيه: انتهت مهلة محاولة الطباعة الصامتة لتفادي تعليق الشاشة');
+          cleanup(false);
+        }, 3500);
+
+        printWindow.webContents.print(printOptions, (success: boolean, failureReason: string) => {
+          clearTimeout(timer);
+          if (!success) {
+            console.warn('Silent receipt print warning, reason:', failureReason);
           }
-        );
+          cleanup(success);
+        });
       });
     } catch (err) {
       console.warn('تعذر الاتصال بالطابعة المباشرة:', err);
-      return true;
+      return false;
     }
   }
 

@@ -355,7 +355,16 @@ export class SalesService {
    */
   getSaleById(id: number): Sale | null {
     const db = this.getDb();
-    const saleRow = db.prepare('SELECT * FROM sales WHERE id = ?').get(id) as any;
+    const saleRow = db.prepare(`
+      SELECT s.*,
+             u.display_name as cashier_name,
+             c.name as customer_name,
+             c.phone as customer_phone
+      FROM sales s
+      LEFT JOIN users u ON s.user_id = u.id
+      LEFT JOIN customers c ON s.customer_id = c.id
+      WHERE s.id = ?
+    `).get(id) as any;
     if (!saleRow) return null;
 
     const items = db

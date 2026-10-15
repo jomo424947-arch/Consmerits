@@ -41,6 +41,7 @@ export function ProductFormModal({
       setBrandName(productToEdit.brand === 'بدون علامة' ? '' : productToEdit.brand || '');
       setPriceStr(productToEdit.price ? (productToEdit.price / 100).toString() : '0');
       setBarcode(productToEdit.primaryBarcode === '---' ? '' : productToEdit.primaryBarcode || '');
+      setInitialStockStr((productToEdit.totalStock ?? 0).toString());
       setPriceReason('');
     } else {
       setNameAr('');
@@ -85,7 +86,8 @@ export function ProductFormModal({
 
       if (isEditing && productToEdit) {
         // تحديث منتج قائم
-        const updatePayload = {
+        const stockNum = parseInt(initialStockStr, 10);
+        const updatePayload: any = {
           name_ar: nameAr.trim(),
           category_name: categoryName.trim() || 'عام',
           brand_name: brandName.trim() || null,
@@ -95,14 +97,23 @@ export function ProductFormModal({
           price_change_reason: priceReason.trim() || undefined,
         };
 
+        if (!isNaN(stockNum) && stockNum >= 0 && stockNum !== productToEdit.totalStock) {
+          updatePayload.stock = stockNum;
+        }
+
+        let res: any;
         if (electron?.updateProduct) {
-          await electron.updateProduct(productToEdit.id, updatePayload);
+          res = await electron.updateProduct(productToEdit.id, updatePayload);
         } else if (electron?.invoke) {
-          await electron.invoke('products:update', productToEdit.id, updatePayload);
+          res = await electron.invoke('products:update', productToEdit.id, updatePayload);
+        }
+
+        if (res && res.success === false) {
+          throw new Error(res.error || 'تعذر تحديث بيانات المنتج');
         }
 
         sounds.playSaleSuccess();
-        toastSuccess('تم تحديث بيانات وسعر المنتج بنجاح وتوثيق التغيير في سجل الرقابة');
+        toastSuccess('تم تحديث بيانات وسعر ومخزون المنتج بنجاح');
       } else {
         // إنشاء منتج جديد
         const stock = parseInt(initialStockStr, 10) || 0;
@@ -122,10 +133,15 @@ export function ProductFormModal({
           ],
         };
 
+        let res: any;
         if (electron?.createProduct) {
-          await electron.createProduct(payload);
+          res = await electron.createProduct(payload);
         } else if (electron?.invoke) {
-          await electron.invoke('products:create', payload);
+          res = await electron.invoke('products:create', payload);
+        }
+
+        if (res && res.success === false) {
+          throw new Error(res.error || 'تعذر حفظ المنتج الجديد');
         }
 
         sounds.playSaleSuccess();
@@ -205,7 +221,7 @@ export function ProductFormModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isEditing ? '1fr' : '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
               سعر البيع (ج.م) *
@@ -220,19 +236,18 @@ export function ProductFormModal({
             />
           </div>
 
-          {!isEditing && (
-            <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
-                رصيد المخزون الافتتاحي
-              </label>
-              <Input
-                type="number"
-                value={initialStockStr}
-                onChange={(e) => setInitialStockStr(e.target.value)}
-                placeholder="10"
-              />
-            </div>
-          )}
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>
+              {isEditing ? 'رصيد المخزون (قطعة)' : 'رصيد المخزون الافتتاحي'}
+            </label>
+            <Input
+              type="number"
+              value={initialStockStr}
+              onChange={(e) => setInitialStockStr(e.target.value)}
+              placeholder="10"
+              min={0}
+            />
+          </div>
         </div>
 
         {isEditing && (

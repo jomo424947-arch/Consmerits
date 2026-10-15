@@ -702,7 +702,7 @@ export class AuthService {
     const db = this.getDb();
     const owner = db
       .prepare(
-        "SELECT id FROM users WHERE role = 'owner' AND is_active = 1 AND username NOT IN ('mohamed_joker', 'test_admin') LIMIT 1"
+        "SELECT id FROM users WHERE role = 'owner' AND is_active = 1 LIMIT 1"
       )
       .get();
     return !!owner;

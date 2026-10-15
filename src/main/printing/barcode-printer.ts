@@ -341,7 +341,7 @@ export class BarcodePrinter {
   }
 
   /**
-   * جلب قائمة الطابعات المثبتة على نظام التشغيل مع تصنيف طابعات الباركود الحرارية
+   * جلب قائمة الطابعات المثبتة على نظام التشغيل مع فحص حالة الاتصال الحقيقية (Online/Offline)
    */
   async getSystemPrinters(): Promise<SystemPrinterInfo[]> {
     try {
@@ -353,8 +353,29 @@ export class BarcodePrinter {
       }
 
       const rawPrinters = await win.webContents.getPrintersAsync();
+
+      // فحص حالة الاتصال الفعلية لويندوز (WorkOffline)
+      const offlineSet = new Set<string>();
+      if (process.platform === 'win32') {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { execSync } = require('child_process');
+          const psOut = execSync(
+            'powershell -NoProfile -Command "Get-CimInstance Win32_Printer | Select-Object Name, WorkOffline | ConvertTo-Json"',
+            { timeout: 3500 }
+          ).toString();
+          const parsed = JSON.parse(psOut);
+          const list = Array.isArray(parsed) ? parsed : [parsed];
+          for (const item of list) {
+            if (item && item.WorkOffline === true && item.Name) {
+              offlineSet.add(item.Name.toLowerCase().trim());
+            }
+          }
+        } catch {}
+      }
+
       return rawPrinters.map((p: any) => {
-        const lowerName = (p.name || '').toLowerCase();
+        const lowerName = (p.name || '').toLowerCase().trim();
         const isThermal =
           lowerName.includes('xp-') ||
           lowerName.includes('xprinter') ||
@@ -365,16 +386,19 @@ export class BarcodePrinter {
           lowerName.includes('thermal') ||
           lowerName.includes('pos');
 
-        let statusText = 'جاهزة';
-        if (p.status !== 0) {
-          statusText = 'بها خطأ / غير متصلة';
+        const isOffline = offlineSet.has(lowerName);
+        let statusText = 'جاهزة ومتصلة';
+        if (isOffline) {
+          statusText = 'غير متصلة (Offline)';
+        } else if (p.status !== 0) {
+          statusText = 'بها خطأ / مشغولة';
         }
 
         return {
           name: p.name,
           displayName: p.displayName || p.name,
           isDefault: Boolean(p.isDefault),
-          status: p.status,
+          status: isOffline ? 128 : p.status,
           statusText,
           isThermalRecommended: isThermal,
         };
@@ -386,30 +410,44 @@ export class BarcodePrinter {
   }
 
   /**
-   * تحديد اسم الطابعة الأكثر ملاءمة لطباعة الباركود (المحددة يدوياً، أو المحفوظة، أو طابعة Xprinter النشطة)
+   * تحديد اسم الطابعة الأكثر ملاءمة لطباعة الباركود
+   * تفضل تلقائياً الطابعة الحرارية الافتراضية المتصلة بنجاح
    */
   async resolveTargetPrinter(explicitName?: string): Promise<string | undefined> {
-    if (explicitName && explicitName.trim()) {
-      return explicitName.trim();
-    }
-
-    const configured = this.getConfiguredPrinterName();
-    if (configured && configured.trim()) {
-      return configured.trim();
-    }
-
     const printers = await this.getSystemPrinters();
     if (printers.length === 0) return undefined;
 
-    // تفضيل طابعة باركود حرارية بحالة عادية (Online/Normal)
-    const onlineThermal = printers.find((p) => p.isThermalRecommended && p.status === 0);
-    if (onlineThermal) return onlineThermal.name;
+    // 1. إذا تم تحديد طابعة صريحة وهي متصلة (Online)
+    if (explicitName && explicitName.trim()) {
+      const match = printers.find((p) => p.name.toLowerCase() === explicitName.trim().toLowerCase());
+      if (match && match.status === 0) return match.name;
+    }
 
-    // أي طابعة باركود حرارية مثبتة
-    const anyThermal = printers.find((p) => p.isThermalRecommended);
-    if (anyThermal) return anyThermal.name;
+    // 2. الطابعة المحفوظة في الإعدادات إن كانت متصلة (Online)
+    const configured = this.getConfiguredPrinterName();
+    if (configured && configured.trim()) {
+      const match = printers.find((p) => p.name.toLowerCase() === configured.trim().toLowerCase());
+      if (match && match.status === 0) return match.name;
+    }
 
-    // الطابعة الافتراضية
+    // 3. الطابعة الحرارية الافتراضية لويندوز والمتصلة (Online)
+    const defaultThermalOnline = printers.find((p) => p.isThermalRecommended && p.isDefault && p.status === 0);
+    if (defaultThermalOnline) return defaultThermalOnline.name;
+
+    // 4. أي طابعة باركود حرارية متصلة (Online)
+    const anyThermalOnline = printers.find((p) => p.isThermalRecommended && p.status === 0);
+    if (anyThermalOnline) return anyThermalOnline.name;
+
+    // 5. أي طابعة افتراضية متصلة (Online)
+    const defaultOnline = printers.find((p) => p.isDefault && p.status === 0);
+    if (defaultOnline) return defaultOnline.name;
+
+    // 6. أي طابعة متصلة بالنظام
+    const anyOnline = printers.find((p) => p.status === 0);
+    if (anyOnline) return anyOnline.name;
+
+    // 7. إذا لم تكن هناك أي طابعة متصلة، نرجع الطابعة المحددة أو الافتراضية
+    if (explicitName && explicitName.trim()) return explicitName.trim();
     const defaultPrinter = printers.find((p) => p.isDefault);
     if (defaultPrinter) return defaultPrinter.name;
 
@@ -467,6 +505,19 @@ export class BarcodePrinter {
 
     try {
       const targetPrinterName = await this.resolveTargetPrinter(options?.printerName);
+      const systemPrinters = await this.getSystemPrinters();
+      const targetedInfo = systemPrinters.find(
+        (p) => p.name.toLowerCase() === (targetPrinterName || '').toLowerCase()
+      );
+
+      // إذا كانت الطابعة المستهدفة غير متصلة (Offline) بشكل قاطع ولا يوجد بديل متصل
+      if (targetedInfo && targetedInfo.status !== 0) {
+        return {
+          success: false,
+          error: `الطابعة (${targetPrinterName}) غير متصلة بالكمبيوتر حالياً (Offline). يرجى التأكد من تشغيل الطابعة وتوصيل كابل USB، أو اختيار الطابعة الأخرى من القائمة.`,
+        };
+      }
+
       const html = this.generateLabelsHtml(labels, widthMm, heightMm);
 
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -482,13 +533,14 @@ export class BarcodePrinter {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
+          backgroundThrottling: false,
         },
       });
 
       let isFinished = false;
 
       return await new Promise<{ success: boolean; error?: string }>((resolve) => {
-        // حزام أمان قصوي: مهلة 10 ثوانٍ تضمن إغلاق النافذة وعدم تعليق الزر نهائياً
+        // حزام أمان قصوي: مهلة 8 ثوانٍ تضمن إغلاق النافذة وعدم تعليق الزر
         const safetyTimer = setTimeout(() => {
           if (!isFinished) {
             isFinished = true;
@@ -498,10 +550,10 @@ export class BarcodePrinter {
             resolve({
               success: false,
               error:
-                'انتهت مهلة استجابة الطابعة (10 ثوانٍ). يرجى التأكد من توصيل كابل USB، تشغيل الطابعة، وعدم وجود انحشار ورق.',
+                `انتهت مهلة استجابة الطابعة (${targetPrinterName || 'الافتراضية'}). يرجى التأكد من تشغيل الطابعة وتوصيل USB واستخدام زر فك التعليق.`,
             });
           }
-        }, 10000);
+        }, 8000);
 
         printWindow.webContents.on('did-fail-load', () => {
           if (!isFinished) {
@@ -520,7 +572,7 @@ export class BarcodePrinter {
         printWindow
           .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
           .then(() => {
-            // انتظار تحميل الخطوط والريندر
+            // انتظار قصير لتحميل وتنسيق الملصقات
             setTimeout(() => {
               if (isFinished || printWindow.isDestroyed()) return;
 
@@ -528,7 +580,11 @@ export class BarcodePrinter {
                 silent: true,
                 printBackground: true,
                 margins: { marginType: 'none' },
-                color: false, // أحادي اللون لضمان أقصى تباين في الطابعات الحرارية
+                color: false,
+                pageSize: {
+                  width: widthMm * 1000,
+                  height: heightMm * 1000,
+                },
               };
 
               if (targetPrinterName) {
@@ -551,7 +607,7 @@ export class BarcodePrinter {
                         success: false,
                         error: failureReason
                           ? `فشل أمر الطباعة: ${failureReason}`
-                          : 'رفضت الطابعة أمر الطباعة المباشر، تحقق من منفذ USB والورق',
+                          : 'رفضت الطابعة أمر الطباعة المباشر، تحقق من تشغيل الطابعة وتوصيل USB',
                       });
                     } else {
                       resolve({ success: true });
@@ -559,7 +615,7 @@ export class BarcodePrinter {
                   }
                 }
               );
-            }, 350);
+            }, 250);
           })
           .catch((loadErr: any) => {
             if (!isFinished) {
@@ -583,3 +639,4 @@ export class BarcodePrinter {
 }
 
 export const barcodePrinter = new BarcodePrinter();
+
