@@ -224,7 +224,7 @@ export function BarcodePrintModal({
     try {
       const electron = (window as any).electron;
       if (electron?.getSystemPrinters) {
-        const res = await electron.getSystemPrinters();
+        const res = await electron.getSystemPrinters(true);
         if (res?.success && Array.isArray(res.data)) {
           setPrinters(res.data);
           toastSuccess('تم تحديث قائمة الطابعات وفحص الاتصال بنجاح');
@@ -250,7 +250,7 @@ export function BarcodePrintModal({
 
           // تحديث قائمة الطابعات بعد فك التعليق
           if (electron.getSystemPrinters) {
-            const pRes = await electron.getSystemPrinters();
+            const pRes = await electron.getSystemPrinters(true);
             if (pRes?.success && Array.isArray(pRes.data)) {
               setPrinters(pRes.data);
             }

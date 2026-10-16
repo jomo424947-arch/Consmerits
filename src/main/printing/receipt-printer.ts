@@ -4,10 +4,14 @@
  * أمر فتح درج النقدية RJ11، والتراجع الآمن عند غياب الطابعة
  */
 
+import fs from 'fs';
+import path from 'path';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/connection';
 import { Sale } from '../../shared/types/sales.types';
 import { formatPiastersToPounds } from '../../shared/utils/money';
+import { generateCode128Svg } from '../../shared/utils/barcode';
+import { printEngine } from './print-engine';
 
 export interface ReceiptConfig {
   storeName: string;
@@ -19,53 +23,6 @@ export interface ReceiptConfig {
   widthMm: number;
   currency: string;
   logoDataUrl?: string;
-}
-
-// أنماط باركود Code128 (المعيار الدولي لطباعة الباركود في الإيصالات)
-const CODE128_PATTERNS = [
-  '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
-  '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
-  '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
-  '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
-  '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
-  '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
-  '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
-  '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
-  '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
-  '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
-  '114131','311141','411131','211412','211214','211232','2331112'
-];
-
-/**
- * توليد باركود Code128 SVG نقي بدقة عالية دون الحاجة لمكتبات خارجية
- */
-function generateCode128Svg(text: string, height: number = 38): string {
-  const clean = text.trim() || 'INV-00000';
-  const codes = [104]; // Start Code B
-  let checksum = 104;
-  for (let i = 0; i < clean.length; i++) {
-    const code = clean.charCodeAt(i) - 32;
-    codes.push(code >= 0 && code < 103 ? code : 0);
-    checksum += (code >= 0 && code < 103 ? code : 0) * (i + 1);
-  }
-  codes.push(checksum % 103);
-  codes.push(106); // Stop Code
-
-  let bars = '';
-  let x = 8;
-  for (const c of codes) {
-    const pattern = CODE128_PATTERNS[c] || CODE128_PATTERNS[0];
-    let isBar = true;
-    for (let j = 0; j < pattern.length; j++) {
-      const w = parseInt(pattern[j], 10);
-      if (isBar) {
-        bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`;
-      }
-      x += w;
-      isBar = !isBar;
-    }
-  }
-  return `<svg viewBox="0 0 ${x + 8} ${height}" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;width:100%;max-width:190px;height:${height}px;">${bars}</svg>`;
 }
 
 /**
@@ -114,6 +71,8 @@ function isDefaultVariant(name?: string | null): boolean {
 
 export class ReceiptPrinter {
   private db?: Database.Database;
+  private cachedLogoDataUrl: string | null = null;
+  private cachedLogoPath: string | null = null;
 
   constructor(db?: Database.Database) {
     this.db = db;
@@ -136,30 +95,32 @@ export class ReceiptPrinter {
     const map = new Map<string, string>();
     rows.forEach((r) => map.set(r.key, r.value));
 
-    // استخراج الشعار كـ base64 data url إن وُجد
+    // استخراج الشعار كـ base64 data url إن وُجد (مع التخزين المؤقت لتجنب القراءة المتكررة من القرص)
     let logoDataUrl = '';
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const path = require('path');
-      const customPath = map.get('store_logo_path');
-      const candidates = [
-        customPath,
-        path.join(process.cwd(), 'public', 'logo.png'),
-        path.join(__dirname, '../../public/logo.png'),
-        path.join(__dirname, '../../../public/logo.png'),
-        path.join(__dirname, '../public/logo.png'),
-      ].filter(Boolean);
+    const customPath = map.get('store_logo_path') || '';
+    if (this.cachedLogoDataUrl && this.cachedLogoPath === customPath) {
+      logoDataUrl = this.cachedLogoDataUrl;
+    } else {
+      try {
+        const candidates = [
+          customPath,
+          path.join(process.cwd(), 'public', 'logo.png'),
+          path.join(__dirname, '../../public/logo.png'),
+          path.join(__dirname, '../../../public/logo.png'),
+          path.join(__dirname, '../public/logo.png'),
+        ].filter(Boolean);
 
-      for (const p of candidates) {
-        if (p && fs.existsSync(p)) {
-          const ext = path.extname(p).replace('.', '') || 'png';
-          logoDataUrl = `data:image/${ext};base64,${fs.readFileSync(p).toString('base64')}`;
-          break;
+        for (const p of candidates) {
+          if (p && fs.existsSync(p)) {
+            const ext = path.extname(p).replace('.', '') || 'png';
+            logoDataUrl = `data:image/${ext};base64,${fs.readFileSync(p).toString('base64')}`;
+            this.cachedLogoDataUrl = logoDataUrl;
+            this.cachedLogoPath = customPath;
+            break;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     return {
       storeName: map.get('store_name') || 'بوتيك جوري (Boutique Gouri)',
@@ -218,7 +179,7 @@ export class ReceiptPrinter {
 
     // تجهيز بنود الفاتورة
     const itemsHtml = items
-      .map((it, idx) => {
+      .map((it) => {
         const showVariant = !isDefaultVariant(it.variant_name);
         return `
         <tr class="item-row">
@@ -646,33 +607,12 @@ export class ReceiptPrinter {
   }
 
   /**
-   * طباعة إيصال الفاتورة
+   * طباعة إيصال الفاتورة بسرعة فائقة وبدون تعليق الواجهة
    */
   async printSaleReceipt(sale: Sale): Promise<boolean> {
     try {
       const config = this.getReceiptConfig();
       const html = this.generateReceiptHtml(sale, config);
-
-      // في بيئة Electron
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { BrowserWindow } = require('electron');
-      if (!BrowserWindow) {
-        return true;
-      }
-
-      const printWindow = new BrowserWindow({
-        show: false,
-        width: 400,
-        height: 800,
-        webPreferences: { nodeIntegration: false },
-      });
-
-      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
-      // انتظار قصير لتجهيز وتصيير الصفحة
-      await new Promise((resolve) => setTimeout(resolve, 250));
-
-      const widthMicrons = (config.widthMm || 80) * 1000;
 
       // قراءة اسم الطابعة المحددة من الإعدادات إن وُجدت
       let printerName: string | undefined;
@@ -685,47 +625,23 @@ export class ReceiptPrinter {
         }
       } catch {}
 
-      const printOptions: any = {
+      const widthMicrons = (config.widthMm || 80) * 1000;
+
+      // إرسال المهمة لمحرك الطباعة عالي السرعة (إعادة استخدام النافذة وحساب الارتفاع تلقائياً)
+      const res = await printEngine.print({
+        html,
+        deviceName: printerName,
         silent: true,
         printBackground: true,
-        margins: { marginType: 'none' },
         pageSize: {
           width: widthMicrons,
-          height: 297000,
+          height: 200000,
         },
-      };
-
-      if (printerName) {
-        printOptions.deviceName = printerName;
-      }
-
-      return new Promise<boolean>((resolve) => {
-        let isDone = false;
-        const cleanup = (result: boolean) => {
-          if (isDone) return;
-          isDone = true;
-          try {
-            if (!printWindow.isDestroyed()) {
-              printWindow.close();
-            }
-          } catch {}
-          resolve(result);
-        };
-
-        // مؤقت أمان يمنع تعليق الشاشة إطلاقاً (أقصى مهلة 3.5 ثانية)
-        const timer = setTimeout(() => {
-          console.warn('تنبيه: انتهت مهلة محاولة الطباعة الصامتة لتفادي تعليق الشاشة');
-          cleanup(false);
-        }, 3500);
-
-        printWindow.webContents.print(printOptions, (success: boolean, failureReason: string) => {
-          clearTimeout(timer);
-          if (!success) {
-            console.warn('Silent receipt print warning, reason:', failureReason);
-          }
-          cleanup(success);
-        });
+        calculateDynamicHeight: true,
+        timeoutMs: 8000,
       });
+
+      return res.success;
     } catch (err) {
       console.warn('تعذر الاتصال بالطابعة المباشرة:', err);
       return false;

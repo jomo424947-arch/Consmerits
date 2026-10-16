@@ -130,4 +130,32 @@ describe('ProductsService', () => {
     const updated = productsService.getProductDetails(product.id);
     expect(updated.variants[0].selling_price).toBe(11000); // 110 ج.م
   });
+
+  test('أرشفة المنتج وتعطيل نشاطه ودرجاته بنجاح archiveProduct', async () => {
+    const product = await productsService.createProduct({
+      name_ar: 'ماسكارا لتكثيف الرموش',
+      variants: [
+        {
+          variant_name: 'أسود داكن',
+          selling_price: 8500,
+          barcodes: ['7766554433221'],
+        },
+      ],
+    });
+
+    const archiveSuccess = await productsService.archiveProduct(product.id);
+    expect(archiveSuccess).toBe(true);
+
+    const row = db
+      .prepare('SELECT is_active, updated_at FROM products WHERE id = ?')
+      .get(product.id) as { is_active: number; updated_at: string };
+    expect(row.is_active).toBe(0);
+    expect(row.updated_at).toBeDefined();
+
+    const variantRow = db
+      .prepare('SELECT is_active, updated_at FROM product_variants WHERE product_id = ?')
+      .get(product.id) as { is_active: number; updated_at: string };
+    expect(variantRow.is_active).toBe(0);
+    expect(variantRow.updated_at).toBeDefined();
+  });
 });

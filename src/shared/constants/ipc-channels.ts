@@ -68,7 +68,7 @@ export const IPC_CHANNELS = {
   INVENTORY_GET_STOCK: 'inventory:get-stock',
   INVENTORY_GET_EXPIRING: 'inventory:get-expiring',
   INVENTORY_RECORD_MOVEMENT: 'inventory:record-movement',
-  INVENTORY_SUBMIT_AUDIT: 'inventory:submit-audit',
+  // INVENTORY_SUBMIT_AUDIT: 'inventory:submit-audit', // محجوز للإصدارات القادمة
   INVENTORY_GET_MOVEMENTS: 'inventory:get-movements',
   INVENTORY_CREATE_COUNT: 'inventory:create-count',
   INVENTORY_GET_COUNTS: 'inventory:get-counts',
@@ -139,7 +139,7 @@ export const IPC_CHANNELS = {
   REPORTS_GET_PAYMENT_METHODS: 'reports:get-payment-methods',
   REPORTS_GET_PRODUCT_PERFORMANCE: 'reports:get-product-performance',
   REPORTS_GET_CASH_FLOW: 'reports:get-cash-flow',
-  REPORTS_EXPORT_EXCEL: 'reports:export-excel',
+  // REPORTS_EXPORT_EXCEL: 'reports:export-excel', // محجوز للإصدارات القادمة
 
   // Settings & Backup
   SETTINGS_GET_ALL: 'settings:get-all',

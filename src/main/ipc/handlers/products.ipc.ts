@@ -222,9 +222,9 @@ export function registerProductsIpcHandlers(): void {
   });
 
   // جلب قائمة الطابعات المثبتة وتصنيف طابعات الباركود الحرارية
-  ipcMain.handle(IPC_CHANNELS.PRINTERS_LIST, async () => {
+  ipcMain.handle(IPC_CHANNELS.PRINTERS_LIST, async (_event, forceRefresh?: boolean) => {
     try {
-      const printers = await barcodePrinter.getSystemPrinters();
+      const printers = await barcodePrinter.getSystemPrinters(forceRefresh);
       return { success: true, data: printers };
     } catch (err: any) {
       return { success: false, error: err.message, data: [] };

@@ -97,8 +97,8 @@ const electronAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.PRODUCTS_IMPORT_EXCEL, fileContentOrRows, actorUserId),
   printBarcodeLabels: (labels: any, options?: any) =>
     ipcRenderer.invoke(IPC_CHANNELS.BARCODES_PRINT_LABELS, labels, options),
-  getSystemPrinters: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.PRINTERS_LIST),
+  getSystemPrinters: (forceRefresh?: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRINTERS_LIST, forceRefresh),
   clearPrintQueue: (printerName?: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.PRINTERS_CLEAR_QUEUE, printerName),
 

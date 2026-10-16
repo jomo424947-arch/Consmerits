@@ -62,7 +62,12 @@ export function InvoicesScreen(): React.ReactElement {
       sounds.playClick();
       const electron = (window as any).electron;
       if (electron?.printReceipt) {
-        await electron.printReceipt(sale.id);
+        const res = await electron.printReceipt(sale.id);
+        if (res && !res.success) {
+          sounds.playError();
+          toastError(res.error || 'تعذر إرسال الفاتورة للطابعة الحرارية');
+          return;
+        }
         sounds.playSaleSuccess();
         toastSuccess(`تم إرسال الفاتورة #${sale.invoice_no} للطباعة`);
       }

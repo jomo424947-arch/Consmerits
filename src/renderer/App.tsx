@@ -16,6 +16,7 @@ import { LoginPage, LockScreen, InitialSetupWizard } from './features/auth';
 import { SafeUser } from '../shared/types/users.types';
 import { Loader2 } from 'lucide-react';
 import logoImg from './assets/logo.png';
+import { api } from './lib/api';
 
 export type NavTab =
   | 'pos'
@@ -42,17 +43,16 @@ export function AppContent(): React.ReactElement {
   useEffect(() => {
     const checkInitialSession = async () => {
       try {
-        const electron = (window as any).electron;
-        if (electron?.checkSetupStatus) {
-          const setupRes = await electron.checkSetupStatus();
-          if (setupRes && setupRes.success !== false) {
-            setIsSetupCompleted(setupRes.isSetupCompleted);
+        if (api?.checkSetupStatus) {
+          const setupRes = await api.checkSetupStatus();
+          if (setupRes && (setupRes as any).success !== false) {
+            setIsSetupCompleted((setupRes as any).isSetupCompleted);
           }
         }
-        if (electron?.getCurrentUser) {
-          const res = await electron.getCurrentUser();
-          if (res?.success && res.data) {
-            setCurrentUser(res.data);
+        if (api?.getCurrentUser) {
+          const res = await api.getCurrentUser();
+          if (res?.success && (res as any).data) {
+            setCurrentUser((res as any).data);
           }
         }
       } catch (err) {
@@ -67,9 +67,8 @@ export function AppContent(): React.ReactElement {
 
   // الاستماع لأحداث القفل التلقائي من المعالج الرئيسي
   useEffect(() => {
-    const electron = (window as any).electron;
-    if (electron?.onLockStateChanged) {
-      const cleanup = electron.onLockStateChanged((state: { isLocked: boolean }) => {
+    if (api?.onLockStateChanged) {
+      const cleanup = api.onLockStateChanged((state: { isLocked: boolean }) => {
         setIsLocked(state.isLocked);
       });
       return cleanup;
@@ -81,15 +80,13 @@ export function AppContent(): React.ReactElement {
     const now = Date.now();
     if (now - lastActivityReport.current > 10000) {
       lastActivityReport.current = now;
-      const electron = (window as any).electron;
-      electron?.reportActivity?.();
+      api?.reportActivity?.();
     }
   };
 
   const handleLogout = async () => {
     try {
-      const electron = (window as any).electron;
-      await electron?.logout?.();
+      await api?.logout?.();
     } finally {
       setCurrentUser(null);
       setIsLocked(false);
@@ -178,8 +175,7 @@ export function AppContent(): React.ReactElement {
         setCurrentUser,
         logout: handleLogout,
         lockScreen: () => {
-          const electron = (window as any).electron;
-          electron?.lockScreen?.();
+          api?.lockScreen?.();
         },
       }}
     >

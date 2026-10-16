@@ -34,6 +34,7 @@ export function InvoiceReceiptModal({
 }: InvoiceReceiptModalProps): React.ReactElement | null {
   const { success: toastSuccess, error: toastError } = useToast();
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [storeSettings, setStoreSettings] = useState({
     storeName: 'بوتيك جوري - Boutique Gouri',
     storeAddress: 'شارع التحرير، الدقي، الجيزة',
@@ -46,7 +47,10 @@ export function InvoiceReceiptModal({
 
   // جلب إعدادات المحل والعنوان والهاتف
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsSettingsLoaded(false);
+      return;
+    }
 
     const fetchSettings = async () => {
       try {
@@ -66,22 +70,25 @@ export function InvoiceReceiptModal({
         }
       } catch (e) {
         console.warn('Failed to load store settings for receipt:', e);
+      } finally {
+        setIsSettingsLoaded(true);
       }
     };
 
     fetchSettings();
   }, [isOpen]);
 
-  // طباعة تلقائية في الخلفية بدون تعليق الواجهة إذا كانت مفعلة
+  // طباعة تلقائية في الخلفية بدون تعليق الواجهة بعد التأكد من اكتمال تحميل الإعدادات
   useEffect(() => {
-    if (isOpen && sale && autoPrint && !hasAutoPrintedRef.current) {
+    if (isOpen && sale && autoPrint && isSettingsLoaded && !hasAutoPrintedRef.current) {
       hasAutoPrintedRef.current = true;
       handleThermalPrint(true);
     }
     if (!isOpen) {
       hasAutoPrintedRef.current = false;
+      setIsSettingsLoaded(false);
     }
-  }, [isOpen, sale, autoPrint]);
+  }, [isOpen, sale, autoPrint, isSettingsLoaded]);
 
   if (!isOpen || !sale) return null;
 
@@ -108,7 +115,8 @@ export function InvoiceReceiptModal({
           sounds.playSaleSuccess();
           toastSuccess(`تم إرسال الفاتورة #${sale.invoice_no} للطابعة الحرارية`);
         } else {
-          toastSuccess('تم تحويل أمر الطباعة للطابعة الحرارية');
+          sounds.playError();
+          toastError(res?.error || 'تعذر إرسال الفاتورة للطابعة الحرارية، تحقق من تشغيل الطابعة وتوصيل الكابل');
         }
       } else {
         window.print();

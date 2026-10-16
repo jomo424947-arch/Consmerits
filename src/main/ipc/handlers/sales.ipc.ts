@@ -9,6 +9,7 @@ import { salesService } from '../../services/sales.service';
 import { sessionService } from '../../services/session.service';
 import { cashService } from '../../services/cash.service';
 import { receiptPrinter } from '../../printing/receipt-printer';
+import { auditService } from '../../services/audit.service';
 
 export function registerSalesIpcHandlers(): void {
   // إنشاء فاتورة جديدة
@@ -120,9 +121,33 @@ export function registerSalesIpcHandlers(): void {
         return { success: false, error: 'الفاتورة غير موجودة' };
       }
       const printed = await receiptPrinter.printSaleReceipt(sale);
-      return { success: true, data: { printed } };
+      if (!printed) {
+        return {
+          success: false,
+          error: 'تعذر إرسال الفاتورة للطابعة الحرارية. يرجى التحقق من توصيل الطابعة وتشغيلها أو فك تعليق المهام.',
+          data: { printed: false },
+        };
+      }
+
+      // توثيق عملية الطباعة في سجل التدقيق الأمني
+      try {
+        const currentUserId = sessionService.getCurrentUser()?.id || sale.user_id || 1;
+        auditService.log({
+          userId: currentUserId,
+          action: 'PRINT_RECEIPT',
+          entityType: 'sale',
+          entityId: sale.id,
+          details: {
+            invoiceNo: sale.invoice_no,
+            total: sale.total,
+          },
+        });
+      } catch {}
+
+      return { success: true, data: { printed: true } };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   });
 }
+

@@ -24,7 +24,6 @@ dist/
 dist-electron/
 release/
 out/
-build/
 
 # Database files & SQLite WAL
 *.db

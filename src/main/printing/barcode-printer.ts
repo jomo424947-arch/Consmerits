@@ -11,8 +11,14 @@
 
 import JsBarcode from 'jsbarcode';
 import { DOMImplementation, XMLSerializer } from '@xmldom/xmldom';
+import { BrowserWindow } from 'electron';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/connection';
+import { printEngine } from './print-engine';
+
+const execAsync = promisify(exec);
 
 export interface BarcodeLabelData {
   productName: string;
@@ -39,6 +45,8 @@ export interface SystemPrinterInfo {
 
 export class BarcodePrinter {
   private db?: Database.Database;
+  private printersCache: { data: SystemPrinterInfo[]; timestamp: number } | null = null;
+  private readonly CACHE_TTL_MS = 30000; // تخزين مؤقت لقائمة الطابعات لمدة 30 ثانية لتسريع الطباعة الفوري
 
   constructor(db?: Database.Database) {
     this.db = db;
@@ -342,39 +350,49 @@ export class BarcodePrinter {
 
   /**
    * جلب قائمة الطابعات المثبتة على نظام التشغيل مع فحص حالة الاتصال الحقيقية (Online/Offline)
+   * مدعوم بتخزين مؤقت عالي الأداء لتفادي تعليق واجهة المستخدم
    */
-  async getSystemPrinters(): Promise<SystemPrinterInfo[]> {
+  async getSystemPrinters(forceRefresh = false): Promise<SystemPrinterInfo[]> {
+    // إرجاع القائمة المخزنة مؤقتاً لتسريع الاستجابة الفوري (0ms) إلا إذا طُلب التحديث الإجباري
+    if (
+      !forceRefresh &&
+      this.printersCache &&
+      Date.now() - this.printersCache.timestamp < this.CACHE_TTL_MS
+    ) {
+      return this.printersCache.data;
+    }
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { BrowserWindow } = require('electron');
       const win = BrowserWindow.getAllWindows()[0];
       if (!win) {
-        return [];
+        return this.printersCache?.data || [];
       }
 
       const rawPrinters = await win.webContents.getPrintersAsync();
 
-      // فحص حالة الاتصال الفعلية لويندوز (WorkOffline)
+      // فحص حالة الاتصال الفعلية لويندوز (WorkOffline) بشكل غير متزامن لتفادي تجميد الـ Event Loop
       const offlineSet = new Set<string>();
       if (process.platform === 'win32') {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { execSync } = require('child_process');
-          const psOut = execSync(
+          const { stdout } = await execAsync(
             'powershell -NoProfile -Command "Get-CimInstance Win32_Printer | Select-Object Name, WorkOffline | ConvertTo-Json"',
-            { timeout: 3500 }
-          ).toString();
-          const parsed = JSON.parse(psOut);
-          const list = Array.isArray(parsed) ? parsed : [parsed];
-          for (const item of list) {
-            if (item && item.WorkOffline === true && item.Name) {
-              offlineSet.add(item.Name.toLowerCase().trim());
+            { timeout: 1500 }
+          );
+          if (stdout && stdout.trim()) {
+            const parsed = JSON.parse(stdout);
+            const list = Array.isArray(parsed) ? parsed : [parsed];
+            for (const item of list) {
+              if (item && item.WorkOffline === true && item.Name) {
+                offlineSet.add(item.Name.toLowerCase().trim());
+              }
             }
           }
-        } catch {}
+        } catch {
+          // في حال تأخر أو فشل أمر PowerShell نعتمد على بيانات إلكترون المباشرة دون تجميد النظام
+        }
       }
 
-      return rawPrinters.map((p: any) => {
+      const result: SystemPrinterInfo[] = rawPrinters.map((p: any) => {
         const lowerName = (p.name || '').toLowerCase().trim();
         const isThermal =
           lowerName.includes('xp-') ||
@@ -403,9 +421,17 @@ export class BarcodePrinter {
           isThermalRecommended: isThermal,
         };
       });
+
+      // حفظ القائمة في الذاكرة المؤقتة
+      this.printersCache = {
+        data: result,
+        timestamp: Date.now(),
+      };
+
+      return result;
     } catch (err) {
       console.error('فشل جلب قائمة الطابعات من النظام:', err);
-      return [];
+      return this.printersCache?.data || [];
     }
   }
 
@@ -413,8 +439,11 @@ export class BarcodePrinter {
    * تحديد اسم الطابعة الأكثر ملاءمة لطباعة الباركود
    * تفضل تلقائياً الطابعة الحرارية الافتراضية المتصلة بنجاح
    */
-  async resolveTargetPrinter(explicitName?: string): Promise<string | undefined> {
-    const printers = await this.getSystemPrinters();
+  async resolveTargetPrinter(
+    explicitName?: string,
+    providedPrinters?: SystemPrinterInfo[]
+  ): Promise<string | undefined> {
+    const printers = providedPrinters || (await this.getSystemPrinters());
     if (printers.length === 0) return undefined;
 
     // 1. إذا تم تحديد طابعة صريحة وهي متصلة (Online)
@@ -460,13 +489,10 @@ export class BarcodePrinter {
   async clearPrintQueue(
     printerName?: string
   ): Promise<{ success: boolean; message: string }> {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { exec } = require('child_process');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { promisify } = require('util');
-      const execAsync = promisify(exec);
+    // إبطال التخزين المؤقت لتحديث الحالة فوراً
+    this.printersCache = null;
 
+    try {
       if (process.platform === 'win32') {
         if (printerName) {
           const sanitized = printerName.replace(/["';`$]/g, '');
@@ -494,7 +520,7 @@ export class BarcodePrinter {
   }
 
   /**
-   * طباعة ملصقات الباركود بحماية كاملة من التعليق مع ضبط المقاسات وتحديد الطابعة
+   * طباعة ملصقات الباركود بسرعة فائقة عبر محرك الطباعة المركزي printEngine
    */
   async printLabels(
     labels: BarcodeLabelData[],
@@ -504,8 +530,9 @@ export class BarcodePrinter {
     const heightMm = options?.labelHeightMm || 25;
 
     try {
-      const targetPrinterName = await this.resolveTargetPrinter(options?.printerName);
+      // جلب قائمة الطابعات وتحديد الطابعة المستهدفة في خطوة واحدة بدون استدعاءات مكررة
       const systemPrinters = await this.getSystemPrinters();
+      const targetPrinterName = await this.resolveTargetPrinter(options?.printerName, systemPrinters);
       const targetedInfo = systemPrinters.find(
         (p) => p.name.toLowerCase() === (targetPrinterName || '').toLowerCase()
       );
@@ -520,117 +547,29 @@ export class BarcodePrinter {
 
       const html = this.generateLabelsHtml(labels, widthMm, heightMm);
 
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { BrowserWindow } = require('electron');
-      if (!BrowserWindow) {
-        return { success: true };
+      // إرسال المهمة لمحرك الطباعة السريع مع إعادة استخدام النافذة الخفية
+      const res = await printEngine.print({
+        html,
+        deviceName: targetPrinterName,
+        silent: true,
+        printBackground: true,
+        color: false,
+        pageSize: {
+          width: widthMm * 1000,
+          height: heightMm * 1000,
+        },
+        calculateDynamicHeight: false, // ملصقات الباركود محددة الأبعاد مسبقاً بدقة
+        timeoutMs: 8000,
+      });
+
+      if (!res.success) {
+        return {
+          success: false,
+          error: res.failureReason || 'رفضت الطابعة أمر الطباعة المباشر، تحقق من تشغيل الطابعة وتوصيل USB',
+        };
       }
 
-      const printWindow = new BrowserWindow({
-        show: false,
-        width: 400,
-        height: 600,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          backgroundThrottling: false,
-        },
-      });
-
-      let isFinished = false;
-
-      return await new Promise<{ success: boolean; error?: string }>((resolve) => {
-        // حزام أمان قصوي: مهلة 8 ثوانٍ تضمن إغلاق النافذة وعدم تعليق الزر
-        const safetyTimer = setTimeout(() => {
-          if (!isFinished) {
-            isFinished = true;
-            if (!printWindow.isDestroyed()) {
-              printWindow.close();
-            }
-            resolve({
-              success: false,
-              error:
-                `انتهت مهلة استجابة الطابعة (${targetPrinterName || 'الافتراضية'}). يرجى التأكد من تشغيل الطابعة وتوصيل USB واستخدام زر فك التعليق.`,
-            });
-          }
-        }, 8000);
-
-        printWindow.webContents.on('did-fail-load', () => {
-          if (!isFinished) {
-            isFinished = true;
-            clearTimeout(safetyTimer);
-            if (!printWindow.isDestroyed()) {
-              printWindow.close();
-            }
-            resolve({
-              success: false,
-              error: 'تعذر إنشاء وتنسيق قالب ملصقات الباركود',
-            });
-          }
-        });
-
-        printWindow
-          .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-          .then(() => {
-            // انتظار قصير لتحميل وتنسيق الملصقات
-            setTimeout(() => {
-              if (isFinished || printWindow.isDestroyed()) return;
-
-              const printOptions: any = {
-                silent: true,
-                printBackground: true,
-                margins: { marginType: 'none' },
-                color: false,
-                pageSize: {
-                  width: widthMm * 1000,
-                  height: heightMm * 1000,
-                },
-              };
-
-              if (targetPrinterName) {
-                printOptions.deviceName = targetPrinterName;
-              }
-
-              printWindow.webContents.print(
-                printOptions,
-                (success: boolean, failureReason: string) => {
-                  if (!isFinished) {
-                    isFinished = true;
-                    clearTimeout(safetyTimer);
-                    if (!printWindow.isDestroyed()) {
-                      printWindow.close();
-                    }
-
-                    if (!success) {
-                      console.warn('فشل أمر طباعة الباركود الصامت:', failureReason);
-                      resolve({
-                        success: false,
-                        error: failureReason
-                          ? `فشل أمر الطباعة: ${failureReason}`
-                          : 'رفضت الطابعة أمر الطباعة المباشر، تحقق من تشغيل الطابعة وتوصيل USB',
-                      });
-                    } else {
-                      resolve({ success: true });
-                    }
-                  }
-                }
-              );
-            }, 250);
-          })
-          .catch((loadErr: any) => {
-            if (!isFinished) {
-              isFinished = true;
-              clearTimeout(safetyTimer);
-              if (!printWindow.isDestroyed()) {
-                printWindow.close();
-              }
-              resolve({
-                success: false,
-                error: loadErr?.message || 'فشل تحميل بيانات الملصقات للطباعة',
-              });
-            }
-          });
-      });
+      return { success: true };
     } catch (err: any) {
       console.error('Barcode printer error:', err);
       return { success: false, error: err?.message || 'حدث خطأ غير متوقع أثناء الطباعة' };
