@@ -50,3 +50,7 @@ out/
 *.sw?
 .DS_Store
 Thumbs.db
+
+# License files
+scripts/license-registry.json
+.license*.dat

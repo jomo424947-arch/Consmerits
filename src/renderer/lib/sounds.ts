@@ -133,6 +133,13 @@ class SoundManager {
   }
 
   /**
+   * صوت النجاح
+   */
+  public playSuccess() {
+    this.playSaleSuccess();
+  }
+
+  /**
    * صوت درج النقدية أو حفظ السجل (صوت ميكانيكي راقي)
    */
   public playCashRegister() {

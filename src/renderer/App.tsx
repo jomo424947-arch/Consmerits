@@ -12,7 +12,7 @@ import { ReportsScreen } from './features/reports';
 import { SettingsScreen } from './features/settings';
 import { InvoicesScreen } from './features/invoices';
 import { DatabaseInspectorScreen } from './features/db-inspector';
-import { LoginPage, LockScreen, InitialSetupWizard } from './features/auth';
+import { LoginPage, LockScreen, InitialSetupWizard, ActivationScreen } from './features/auth';
 import { SafeUser } from '../shared/types/users.types';
 import { Loader2 } from 'lucide-react';
 import logoImg from './assets/logo.png';
@@ -36,19 +36,42 @@ export function AppContent(): React.ReactElement {
   const [isLocked, setIsLocked] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSetupCompleted, setIsSetupCompleted] = useState(true);
+  const [isActivated, setIsActivated] = useState<boolean | null>(null);
 
   const lastActivityReport = useRef(0);
 
-  // فحص الجلسة الحالية وحالة تهيئة النظام عند الإقلاع
+  // فحص حالة التفعيل والجلسة عند الاقلاع
   useEffect(() => {
-    const checkInitialSession = async () => {
+    const checkInitialState = async () => {
       try {
+        // الخطوة 1: فحص حالة التفعيل اولا
+        if (api?.checkLicenseStatus) {
+          const licenseRes = await api.checkLicenseStatus();
+          if (licenseRes && licenseRes.success !== false) {
+            setIsActivated(licenseRes.isActivated === true);
+            if (!licenseRes.isActivated) {
+              setIsInitializing(false);
+              return; // لا داعي لفحص الباقي اذا لم يتم التفعيل
+            }
+          } else {
+            setIsActivated(false);
+            setIsInitializing(false);
+            return;
+          }
+        } else {
+          // اذا لم تتوفر الدالة (وضع التطوير)، اعتبر التطبيق مفعلا
+          setIsActivated(true);
+        }
+
+        // الخطوة 2: فحص حالة الاعداد الاولي
         if (api?.checkSetupStatus) {
           const setupRes = await api.checkSetupStatus();
           if (setupRes && (setupRes as any).success !== false) {
             setIsSetupCompleted((setupRes as any).isSetupCompleted);
           }
         }
+
+        // الخطوة 3: فحص الجلسة الحالية
         if (api?.getCurrentUser) {
           const res = await api.getCurrentUser();
           if (res?.success && (res as any).data) {
@@ -62,10 +85,10 @@ export function AppContent(): React.ReactElement {
       }
     };
 
-    checkInitialSession();
+    checkInitialState();
   }, []);
 
-  // الاستماع لأحداث القفل التلقائي من المعالج الرئيسي
+  // الاستماع لاحداث القفل التلقائي من المعالج الرئيسي
   useEffect(() => {
     if (api?.onLockStateChanged) {
       const cleanup = api.onLockStateChanged((state: { isLocked: boolean }) => {
@@ -75,7 +98,7 @@ export function AppContent(): React.ReactElement {
     }
   }, []);
 
-  // رصد نشاط المستخدم لإعادة ضبط مؤقت القفل التلقائي للخمول (Throttled كل 10 ثوانٍ)
+  // رصد نشاط المستخدم لاعادة ضبط مؤقت القفل التلقائي للخمول (Throttled كل 10 ثوان)
   const reportActivity = () => {
     const now = Date.now();
     if (now - lastActivityReport.current > 10000) {
@@ -143,7 +166,32 @@ export function AppContent(): React.ReactElement {
     );
   }
 
-  // إذا لم يتم إعداد النظام لأول مرة، نعرض معالج الإعداد الأولي
+  // اذا لم يتم تفعيل التطبيق، نعرض شاشة التفعيل اولا
+  if (isActivated === false) {
+    return (
+      <ActivationScreen
+        onActivationSuccess={() => {
+          setIsActivated(true);
+          // اعادة فحص حالة الاعداد بعد التفعيل
+          const recheckSetup = async () => {
+            try {
+              if (api?.checkSetupStatus) {
+                const setupRes = await api.checkSetupStatus();
+                if (setupRes && (setupRes as any).success !== false) {
+                  setIsSetupCompleted((setupRes as any).isSetupCompleted);
+                }
+              }
+            } catch {
+              // تجاهل
+            }
+          };
+          recheckSetup();
+        }}
+      />
+    );
+  }
+
+  // اذا لم يتم اعداد النظام لاول مرة، نعرض معالج الاعداد الاولي
   if (!isSetupCompleted) {
     return (
       <InitialSetupWizard
@@ -156,7 +204,7 @@ export function AppContent(): React.ReactElement {
     );
   }
 
-  // إذا لم يكن هناك مستخدم مسجل الدخول، نعرض شاشة تسجيل الدخول
+  // اذا لم يكن هناك مستخدم مسجل الدخول، نعرض شاشة تسجيل الدخول
   if (!currentUser) {
     return (
       <LoginPage
@@ -225,3 +273,4 @@ export function App(): React.ReactElement {
 }
 
 export default App;
+

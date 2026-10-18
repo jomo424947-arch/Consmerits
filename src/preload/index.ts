@@ -387,6 +387,18 @@ const electronAPI = {
   },
 
   // ==========================================
+  // License & Activation
+  // ==========================================
+  checkLicenseStatus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.LICENSE_CHECK_STATUS),
+  activateLicense: (key: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.LICENSE_ACTIVATE, key),
+  getMachineId: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GET_MACHINE_ID),
+  getLicenseInfo: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GET_INFO),
+
+  // ==========================================
   // Generic Whitelisted IPC Bridge
   // ==========================================
   invoke: (channel: string, ...args: unknown[]) => {
