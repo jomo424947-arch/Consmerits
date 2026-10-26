@@ -14,8 +14,8 @@ if (-not (Test-Path $portableDir)) {
     New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
 }
 
-Write-Host "1. نسخ ملف التثبيت المحدث..."
-Copy-Item ".\release\Boutique Gouri - نظام بيع وجرد مستحضرات التجميل Setup 1.0.2.exe" -Destination (Join-Path $target "Boutique Gouri Setup 1.0.2 (نسخة ويندوز 7 المخصصة).exe") -Force
+Write-Host "1. نسخ ملف التثبيت المحدث 1.0.3..."
+Copy-Item ".\release\Boutique Gouri - نظام بيع وجرد مستحضرات التجميل Setup 1.0.3.exe" -Destination (Join-Path $target "Boutique Gouri Setup 1.0.3 (نسخة ويندوز 7 المخصصة).exe") -Force
 
 Write-Host "2. نسخ حزم مايكروسوفت..."
 Copy-Item ".\packages_for_win7\VC_redist.x86.exe" -Destination (Join-Path $packagesDir "VC_redist.x86 (ضروري جداً).exe") -Force

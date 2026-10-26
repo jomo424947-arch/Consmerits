@@ -1,6 +1,6 @@
 {
   "name": "cosmetics-pos-system",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "نظام بيع وجرد لمحل مستحضرات التجميل - Windows Desktop Offline POS & Inventory System",
   "main": "dist-electron/main/index.js",
   "author": "Cosmetics POS Team",
