@@ -3,31 +3,37 @@
  */
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import Database from 'better-sqlite3';
 import { receiptPrinter, ReceiptPrinter } from '../../src/main/printing/receipt-printer';
 import { barcodePrinter, BarcodePrinter } from '../../src/main/printing/barcode-printer';
 import { generateCode128Svg } from '../../src/shared/utils/barcode';
 import { Sale } from '../../src/shared/types/sales.types';
 
 describe('منظومة الطباعة المحدثة (Printing System)', () => {
-  let db: Database.Database;
+  let db: any;
 
   beforeEach(() => {
-    db = new Database(':memory:');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        updated_at TEXT
-      );
-      INSERT INTO settings (key, value) VALUES 
-        ('store_name', 'بوتيك جوري للاختبار'),
-        ('receipt_header', 'أهلاً وسهلاً'),
-        ('receipt_footer', 'شكراً لزيارتكم'),
-        ('receipt_width_mm', '80'),
-        ('currency_symbol', 'ج.م'),
-        ('barcode_printer_name', 'XP-235B');
-    `);
+    const settingsMap: Record<string, string> = {
+      store_name: 'بوتيك جوري للاختبار',
+      receipt_header: 'أهلاً وسهلاً',
+      receipt_footer: 'شكراً لزيارتكم',
+      receipt_width_mm: '80',
+      currency_symbol: 'ج.م',
+      barcode_printer_name: 'XP-235B',
+    };
+
+    db = {
+      prepare: (sql: string) => ({
+        all: () => Object.entries(settingsMap).map(([key, value]) => ({ key, value })),
+        get: (param?: any) => {
+          if (sql.includes("key = 'store_name'")) return { value: settingsMap.store_name };
+          if (sql.includes("key = 'barcode_printer_name'")) return { value: settingsMap.barcode_printer_name };
+          if (sql.includes("key = 'printer_name'")) return { value: settingsMap.printer_name };
+          if (sql.includes('users') && param) return { display_name: 'كاشير المحل' };
+          return undefined;
+        },
+      }),
+      exec: () => {},
+    };
   });
 
   test('توليد باركود Code128 SVG نقي بدقة عالية دون أخطاء', () => {

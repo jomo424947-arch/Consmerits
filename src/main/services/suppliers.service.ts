@@ -294,7 +294,7 @@ export class SuppliersService {
           `).run(
             targetShiftId,
             params.userId,
-            params.amount,
+            -Math.abs(params.amount),
             paymentId,
             `سداد للمورد: ${supplier.name} ${params.note ? `(${params.note})` : ''}`.trim()
           );

@@ -7,7 +7,7 @@
 import path from 'path';
 import fs from 'fs';
 import type Database from 'better-sqlite3';
-import { getDatabase } from '../db/connection';
+import { getDatabase, isDatabaseOpen } from '../db/connection';
 import { auditService as globalAuditService, AuditService } from './audit.service';
 
 export interface BackupResult {
@@ -56,6 +56,9 @@ export class BackupService {
    * - يكتب الملف الناتج مباشرة في المسار المحدد
    */
   async createBackup(destinationPath?: string, userId?: number): Promise<BackupResult> {
+    if (!this.db && !isDatabaseOpen()) {
+      return { filePath: '', sizeBytes: 0, createdAt: new Date().toISOString() };
+    }
     const db = this.getDb();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -69,6 +72,15 @@ export class BackupService {
     }
 
     const fullPath = path.join(targetDir, fileName);
+
+    // إذا وجد ملف بنفس الاسم مسبقاً، نحذفه لتفادي خطأ SQLite: output file already exists
+    if (fs.existsSync(fullPath)) {
+      try {
+        fs.unlinkSync(fullPath);
+      } catch {
+        // تجاهل
+      }
+    }
 
     // SQLite VACUUM INTO: نسخة ذرية متكاملة
     db.exec(`VACUUM INTO '${fullPath.replace(/'/g, "''")}'`);
@@ -201,13 +213,15 @@ export class BackupService {
     const result = await this.createBackup(backupDir, userId);
     this.rotateBackups(30, 5, backupDir);
 
-    const db = this.getDb();
-    try {
-      db.prepare(
-        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('last_auto_backup', ?, datetime('now'))"
-      ).run(result.createdAt);
-    } catch {
-      // تجاهل إذا كانت القاعدة مؤقتة أو غير مهيأة
+    if (this.db || isDatabaseOpen()) {
+      try {
+        const db = this.getDb();
+        db.prepare(
+          "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('last_auto_backup', ?, datetime('now'))"
+        ).run(result.createdAt);
+      } catch {
+        // تجاهل إذا كانت القاعدة مؤقتة أو غير مهيأة
+      }
     }
 
     return result;

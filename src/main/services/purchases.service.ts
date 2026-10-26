@@ -200,7 +200,7 @@ export class PurchasesService {
           `).run(
             targetShiftId,
             input.user_id,
-            paid,
+            -paid,
             purchaseId,
             `سداد فاتورة مشتريات #${invoiceNo} (${supplier.name})`
           );

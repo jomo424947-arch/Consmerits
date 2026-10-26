@@ -44,8 +44,14 @@ describe('Security & Backup Integration Flow (سيناريو الأمان وال
 
   test('دورة أمان متكاملة: دخول كاشير -> طلب تفويض مدير -> اعتماد الخصم -> رصد تدقيق -> تجميد اختراق -> نسخ احتياطي', async () => {
     // 1. إنشاء الحسابات الأساسية
-    const owner = authService.seedDefaultOwnerIfNone()!;
-    expect(owner.username).toBe('mohamed_joker');
+    const owner = authService.createUser({
+      username: 'test_owner',
+      display_name: 'صاحب المحل',
+      password: 'OwnerPass123',
+      pin: '7777',
+      role: USER_ROLES.OWNER,
+    });
+    expect(owner.username).toBe('test_owner');
 
     const manager = authService.createUser({
       username: 'manager_safwat',

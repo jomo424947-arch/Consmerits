@@ -150,11 +150,19 @@ export class CashService {
       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
 
+    // توحيد إشارة المبلغ تلقائياً وفق نوع الحركة لحماية نزاهة حسابات الخزنة
+    let normalizedAmount = movement.amount;
+    if (movement.type === 'withdrawal' || movement.type === 'expense' || movement.type === 'refund') {
+      normalizedAmount = -Math.abs(movement.amount);
+    } else if (movement.type === 'deposit' || movement.type === 'sale') {
+      normalizedAmount = Math.abs(movement.amount);
+    }
+
     const result = stmt.run(
       movement.shift_id,
       movement.user_id ?? null,
       movement.type,
-      movement.amount,
+      normalizedAmount,
       movement.ref_type ?? null,
       movement.ref_id ?? null,
       movement.note ?? null

@@ -15,7 +15,7 @@ import {
   LoginResult,
 } from '../../shared/types/users.types';
 import { USER_ROLES, UserRole } from '../../shared/constants/roles';
-import { ALLOWED_ADMIN_ACCOUNTS, isAllowedAdminUsername } from '../config/admin-accounts.config';
+
 import { auditService as globalAuditService, AuditService } from './audit.service';
 import { sessionService as globalSessionService, SessionService } from './session.service';
 
@@ -393,12 +393,7 @@ export class AuthService {
       throw new Error(`اسم المستخدم "${input.username}" مستخدم بالفعل`);
     }
 
-    // التحقق من الصلاحيات الإدارية لتعيين المالك
-    if (input.role === USER_ROLES.OWNER) {
-      if (!isAllowedAdminUsername(input.username)) {
-        throw new Error('غير مصرح بتعيين هذا الحساب كمدير/مالك. الحسابات الإدارية المعتمدة محددة مسبقاً فقط.');
-      }
-    }
+
 
     const uuid = crypto.randomUUID();
     const password = input.password && input.password.trim() ? input.password : '123456';
@@ -472,9 +467,6 @@ export class AuthService {
     }
 
     if (input.role !== undefined) {
-      if (input.role === USER_ROLES.OWNER && !isAllowedAdminUsername(user.username)) {
-        throw new Error('غير مصرح بترقية هذا المستخدم إلى مدير/مالك. الحسابات الإدارية المعتمدة محددة مسبقاً فقط.');
-      }
       updates.push('role = ?');
       params.push(input.role);
     }
@@ -648,52 +640,7 @@ export class AuthService {
     return true;
   }
 
-  /**
-   * إنشاء وتأكيد وجود الحسابات الإدارية المعتمدة للمحل (محمد الجوكر وحساب الاختبار)
-   */
-  seedDefaultOwnerIfNone(): SafeUser | null {
-    const db = this.getDb();
-    // إزالة أو تعطيل الحساب الافتراضي التجريبي القديم إن وُجد لتعزيز الأمان
-    try {
-      db.prepare("DELETE FROM users WHERE username = 'admin' AND display_name = 'مدير النظام الرئيسي'").run();
-    } catch {
-      // في حال كان للحساب القديم سجلات تدقيق أو عمليات مرتبطة، يتم تعطيله بالكامل وسحب الصلاحيات
-      try {
-        db.prepare(`
-          UPDATE users 
-          SET is_active = 0, 
-              password_hash = 'DISABLED_ACCOUNT', 
-              pin_hash = NULL, 
-              role = 'cashier' 
-          WHERE username = 'admin'
-        `).run();
-      } catch {
-        // تجاهل أي خطأ ثانوي
-      }
-    }
 
-    let primaryOwner: SafeUser | null = null;
-    let seededAny = false;
-
-    for (const admin of ALLOWED_ADMIN_ACCOUNTS) {
-      const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(admin.username);
-      if (!existing) {
-        const user = this.createUser({
-          username: admin.username,
-          display_name: admin.display_name,
-          password: admin.password,
-          pin: admin.pin,
-          role: admin.role,
-        });
-        if (!primaryOwner) {
-          primaryOwner = user;
-        }
-        seededAny = true;
-      }
-    }
-
-    return seededAny ? primaryOwner : null;
-  }
 
   /**
    * فحص هل تم إعداد وتهيئة النظام مسبقاً (وجود حساب مالك نشط)
@@ -743,61 +690,64 @@ export class AuthService {
       return { success: false, error: 'اسم المتجر مطلوب ويجب أن يتكون من حرفين على الأقل' };
     }
 
-    // تنظيف أي حسابات تجريبية أو وهمية متبقية إن وُجدت
-    try {
-      db.prepare("DELETE FROM users WHERE username IN ('mohamed_joker', 'test_admin', 'admin')").run();
-    } catch {
-      // ignore
-    }
-
     const uuid = crypto.randomUUID();
     const password_hash = hashPassword(data.password);
     const pin_hash = hashPin(data.pin.trim());
     const displayName = data.displayName?.trim() || data.username.trim();
 
-    const stmt = db.prepare(`
-      INSERT INTO users (uuid, username, display_name, password_hash, pin_hash, role, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, 'owner', 1, datetime('now'))
-    `);
-
-    const result = stmt.run(
-      uuid,
-      data.username.trim(),
-      displayName,
-      password_hash,
-      pin_hash
-    );
-
-    const insertedId = Number(result.lastInsertRowid);
-
-    // تحديث إعدادات المتجر
     try {
-      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_name', ?, datetime('now'))").run(data.storeName.trim());
-      if (data.storePhone?.trim()) {
-        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_phone', ?, datetime('now'))").run(data.storePhone.trim());
-      }
-      if (data.storeAddress?.trim()) {
-        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_address', ?, datetime('now'))").run(data.storeAddress.trim());
-      }
-      db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('system_initialized', '1', datetime('now'))").run();
+      const setupTx = db.transaction(() => {
+        const stmt = db.prepare(`
+          INSERT INTO users (uuid, username, display_name, password_hash, pin_hash, role, is_active, created_at)
+          VALUES (?, ?, ?, ?, ?, 'owner', 1, datetime('now'))
+        `);
+
+        const result = stmt.run(
+          uuid,
+          data.username.trim(),
+          displayName,
+          password_hash,
+          pin_hash
+        );
+
+        const insertedId = Number(result.lastInsertRowid);
+
+        // تحديث إعدادات المتجر داخل نفس الـ Transaction لضمان الذرية (Atomicity)
+        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_name', ?, datetime('now'))").run(data.storeName.trim());
+        if (data.storePhone?.trim()) {
+          db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_phone', ?, datetime('now'))").run(data.storePhone.trim());
+        }
+        if (data.storeAddress?.trim()) {
+          db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('store_address', ?, datetime('now'))").run(data.storeAddress.trim());
+        }
+        db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('system_initialized', '1', datetime('now'))").run();
+
+        return insertedId;
+      });
+
+      const insertedId = setupTx();
+
+      // تسجيل في سجل التدقيق
+      this.auditService.log({
+        userId: insertedId,
+        action: 'SYSTEM_INITIALIZED',
+        entityType: 'users',
+        entityId: insertedId,
+        details: { username: data.username.trim(), store: data.storeName.trim() },
+      });
+
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(insertedId) as User;
+      const safeUser = this.toSafeUser(user);
+      this.sessionService.setCurrentUser(safeUser);
+
+      return { success: true, user: safeUser };
     } catch (err) {
-      console.error('فشل حفظ إعدادات المتجر أثناء التهيئة:', err);
+      console.error('فشل في إتمام التهيئة الأولية:', err);
+      return {
+        success: false,
+        error: `تعذر إتمام عملية التهيئة: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
-
-    // تسجيل في سجل التدقيق
-    this.auditService.log({
-      userId: insertedId,
-      action: 'SYSTEM_INITIALIZED',
-      entityType: 'users',
-      entityId: insertedId,
-      details: { username: data.username.trim(), store: data.storeName.trim() },
-    });
-
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(insertedId) as User;
-    const safeUser = this.toSafeUser(user);
-    this.sessionService.setCurrentUser(safeUser);
-
-    return { success: true, user: safeUser };
   }
 }
 

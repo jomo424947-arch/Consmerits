@@ -2,10 +2,9 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../src/main/db/migrator';
 import { AuthService } from '../../src/main/services/auth.service';
-import { ALLOWED_ADMIN_ACCOUNTS, isAllowedAdminUsername } from '../../src/main/config/admin-accounts.config';
 import { USER_ROLES } from '../../src/shared/constants/roles';
 
-describe('فحص تكامل الحسابات الإدارية المعتمدة والأمان (Admin Integration)', () => {
+describe('فحص تكامل إنشاء الحسابات والإعداد الأولي (Admin Integration)', () => {
   let db: Database.Database;
   let authService: AuthService;
 
@@ -20,96 +19,74 @@ describe('فحص تكامل الحسابات الإدارية المعتمدة �
     db.close();
   });
 
-  test('تكوين الحسابات الإدارية يحتوي على الحسابين المعتمدين فقط', () => {
-    expect(ALLOWED_ADMIN_ACCOUNTS).toHaveLength(2);
+  test('إنشاء حساب مالك عبر معالج الإعداد الأولي بنجاح', async () => {
+    // التأكد أن النظام غير مهيأ (لا يوجد مالك)
+    expect(authService.isSetupCompleted()).toBe(false);
 
-    const joker = ALLOWED_ADMIN_ACCOUNTS.find((a) => a.username === 'mohamed_joker');
-    expect(joker).toBeDefined();
-    expect(joker?.display_name).toBe('محمد الجوكر');
-    expect(joker?.role).toBe(USER_ROLES.OWNER);
-    expect(joker?.pin).toBe('7777');
-
-    const tester = ALLOWED_ADMIN_ACCOUNTS.find((a) => a.username === 'test_admin');
-    expect(tester).toBeDefined();
-    expect(tester?.display_name).toBe('مسؤول الاختبار');
-    expect(tester?.role).toBe(USER_ROLES.OWNER);
-    expect(tester?.pin).toBe('9999');
-
-    expect(isAllowedAdminUsername('mohamed_joker')).toBe(true);
-    expect(isAllowedAdminUsername('test_admin')).toBe(true);
-    expect(isAllowedAdminUsername('hacker')).toBe(false);
-    expect(isAllowedAdminUsername('admin')).toBe(false);
-  });
-
-  test('زرع الحسابين في قاعدة البيانات بنجاح عند الإقلاع الأول', async () => {
-    // إدخال مستخدم قديم مؤقت admin للتأكد من حذفه
-    db.prepare(`
-      INSERT INTO users (uuid, username, display_name, password_hash, role, is_active, created_at)
-      VALUES ('legacy-uuid', 'admin', 'مدير النظام الرئيسي', 'hash', 'owner', 1, datetime('now'))
-    `).run();
-
-    const seededOwner = authService.seedDefaultOwnerIfNone();
-    expect(seededOwner).not.toBeNull();
-    expect(seededOwner?.username).toBe('mohamed_joker');
-
-    // التأكد من وجود الحسابين في قاعدة البيانات
-    const allUsers = db.prepare('SELECT username, display_name, role, is_active FROM users').all() as any[];
-    expect(allUsers).toHaveLength(2);
-
-    const jokerDb = allUsers.find((u) => u.username === 'mohamed_joker');
-    expect(jokerDb).toBeDefined();
-    expect(jokerDb?.role).toBe(USER_ROLES.OWNER);
-
-    const testerDb = allUsers.find((u) => u.username === 'test_admin');
-    expect(testerDb).toBeDefined();
-    expect(testerDb?.role).toBe(USER_ROLES.OWNER);
-
-    // التأكد من حذف admin القديم
-    const oldAdmin = allUsers.find((u) => u.username === 'admin');
-    expect(oldAdmin).toBeUndefined();
-
-    // نجاح تسجيل الدخول بكلمة المرور وبالـ PIN لكلا الحسابين
-    const jokerLogin = await authService.loginWithPasswordDetailed('mohamed_joker', 'Joker@Admin2026');
-    expect(jokerLogin.success).toBe(true);
-    expect(jokerLogin.user?.display_name).toBe('محمد الجوكر');
-
-    const jokerPinLogin = await authService.loginWithPinDetailed('7777');
-    expect(jokerPinLogin.success).toBe(true);
-    expect(jokerPinLogin.user?.username).toBe('mohamed_joker');
-
-    const testAdminLogin = await authService.loginWithPasswordDetailed('test_admin', 'Test@Dev2026');
-    expect(testAdminLogin.success).toBe(true);
-    expect(testAdminLogin.user?.display_name).toBe('مسؤول الاختبار');
-
-    const testAdminPinLogin = await authService.loginWithPinDetailed('9999');
-    expect(testAdminPinLogin.success).toBe(true);
-    expect(testAdminPinLogin.user?.username).toBe('test_admin');
-  });
-
-  test('منع إنشاء أو ترقية أي حساب آخر إلى رتبة مالك (Owner)', () => {
-    // منع إنشاء حساب جديد برتبة مالك إذا لم يكن في القائمة المعتمدة
-    expect(() => {
-      authService.createUser({
-        username: 'intruder',
-        display_name: 'مخترق',
-        password: 'pass',
-        role: USER_ROLES.OWNER,
-      });
-    }).toThrow('غير مصرح بتعيين هذا الحساب كمدير/مالك');
-
-    // إنشاء كاشير عادي ثم محاولة ترقيته إلى مالك
-    const cashier = authService.createUser({
-      username: 'cashier_samy',
-      display_name: 'سامي كاشير',
-      password: 'pass',
-      role: USER_ROLES.CASHIER,
+    // إتمام الإعداد الأولي عبر المعالج
+    const result = await authService.completeInitialSetup({
+      storeName: 'بوتيك جوري',
+      storePhone: '01012345678',
+      storeAddress: 'القاهرة',
+      username: 'shop_owner',
+      displayName: 'صاحب المحل',
+      password: 'SecurePass123',
+      pin: '4321',
     });
 
-    expect(() => {
-      authService.updateUser(cashier.id, {
-        role: USER_ROLES.OWNER,
-      });
-    }).toThrow('غير مصرح بترقية هذا المستخدم إلى مدير/مالك');
+    expect(result.success).toBe(true);
+    expect(result.user).toBeDefined();
+    expect(result.user?.username).toBe('shop_owner');
+    expect(result.user?.role).toBe(USER_ROLES.OWNER);
+
+    // التأكد أن النظام مهيأ الآن
+    expect(authService.isSetupCompleted()).toBe(true);
+
+    // نجاح تسجيل الدخول بكلمة المرور
+    const login = await authService.loginWithPasswordDetailed('shop_owner', 'SecurePass123');
+    expect(login.success).toBe(true);
+
+    // نجاح تسجيل الدخول بـ PIN
+    const pinLogin = await authService.loginWithPinDetailed('4321');
+    expect(pinLogin.success).toBe(true);
+    expect(pinLogin.user?.username).toBe('shop_owner');
+  });
+
+  test('منع إعادة التهيئة الأولية إذا كان المالك موجوداً بالفعل', async () => {
+    // إتمام الإعداد الأولي
+    await authService.completeInitialSetup({
+      storeName: 'بوتيك جوري',
+      username: 'first_owner',
+      displayName: 'المالك الأول',
+      password: 'SecurePass123',
+      pin: '1234',
+    });
+
+    // محاولة إعادة التهيئة يجب أن تفشل
+    const secondSetup = await authService.completeInitialSetup({
+      storeName: 'محل آخر',
+      username: 'second_owner',
+      displayName: 'مالك ثاني',
+      password: 'AnotherPass',
+      pin: '5678',
+    });
+
+    expect(secondSetup.success).toBe(false);
+    expect(secondSetup.error).toContain('تم إعداد النظام مسبقاً');
+  });
+
+  test('السماح بإنشاء حساب مالك بأي اسم مستخدم عبر الإعداد الأولي', async () => {
+    const result = await authService.completeInitialSetup({
+      storeName: 'محل الزهور',
+      username: 'any_owner_name',
+      displayName: 'صاحب المحل',
+      password: 'MyPassword!',
+      pin: '9999',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.user?.username).toBe('any_owner_name');
+    expect(result.user?.role).toBe(USER_ROLES.OWNER);
   });
 
   test('السماح بإنشاء كاشير ومدير صالة بصورة طبيعية', () => {
@@ -130,5 +107,28 @@ describe('فحص تكامل الحسابات الإدارية المعتمدة �
       role: USER_ROLES.CASHIER,
     });
     expect(cashier.role).toBe(USER_ROLES.CASHIER);
+  });
+
+  test('السماح بإنشاء حساب مالك إضافي عبر createUser بعد الإعداد الأولي', async () => {
+    // إعداد أولي
+    await authService.completeInitialSetup({
+      storeName: 'بوتيك جوري',
+      username: 'primary_owner',
+      displayName: 'المالك الرئيسي',
+      password: 'Password123',
+      pin: '1111',
+    });
+
+    // إنشاء مالك إضافي يجب أن ينجح
+    const secondOwner = authService.createUser({
+      username: 'second_owner',
+      display_name: 'شريك المحل',
+      password: 'PartnerPass',
+      pin: '2222',
+      role: USER_ROLES.OWNER,
+    });
+
+    expect(secondOwner.role).toBe(USER_ROLES.OWNER);
+    expect(secondOwner.username).toBe('second_owner');
   });
 });

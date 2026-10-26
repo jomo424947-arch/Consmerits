@@ -87,25 +87,32 @@ describe('AuthService (المصادقة وإدارة المستخدمين وال
     expect(isUnknown).toBe(false);
   });
 
-  test('تهيئة المالك الافتراضي عند خلو قاعدة البيانات وحماية الصلاحيات', () => {
-    const owner = authService.seedDefaultOwnerIfNone();
-    expect(owner).not.toBeNull();
-    expect(owner?.username).toBe('mohamed_joker');
-    expect(owner?.role).toBe(USER_ROLES.OWNER);
+  test('إتمام الإعداد الأولي عبر المعالج (Setup Wizard) وعدم السماح بإعادته', async () => {
+    // التأكد أن النظام غير مهيأ
+    expect(authService.isSetupCompleted()).toBe(false);
 
-    // المرة الثانية لا تنشئ مستخدماً مكرراً
-    const secondCall = authService.seedDefaultOwnerIfNone();
-    expect(secondCall).toBeNull();
+    const result = await authService.completeInitialSetup({
+      storeName: 'بوتيك جوري',
+      username: 'shop_owner',
+      displayName: 'صاحب المحل',
+      password: 'SecurePass123',
+      pin: '4321',
+    });
 
-    // منع إنشاء حساب مالك غير مصرح به
-    expect(() => {
-      authService.createUser({
-        username: 'unauthorized_admin',
-        display_name: 'غير مصرح به',
-        password: 'pass',
-        role: USER_ROLES.OWNER,
-      });
-    }).toThrow('غير مصرح');
+    expect(result.success).toBe(true);
+    expect(result.user?.username).toBe('shop_owner');
+    expect(result.user?.role).toBe(USER_ROLES.OWNER);
+    expect(authService.isSetupCompleted()).toBe(true);
+
+    // منع إعادة التهيئة
+    const secondSetup = await authService.completeInitialSetup({
+      storeName: 'محل آخر',
+      username: 'another_owner',
+      displayName: 'مالك ثاني',
+      password: 'AnotherPass1',
+      pin: '5678',
+    });
+    expect(secondSetup.success).toBe(false);
   });
 
   test('تجميد الحساب تلقائياً بعد 5 محاولات تسجيل دخول خاطئة وفك التجميد', async () => {
@@ -185,8 +192,14 @@ describe('AuthService (المصادقة وإدارة المستخدمين وال
   });
 
   test('قائمة مستخدمي تسجيل الدخول السريع وتحديد الحساب برمز PIN', async () => {
-    // تهيئة المالك وجلب المستخدمين لشاشة تسجيل الدخول
-    authService.seedDefaultOwnerIfNone();
+    // تهيئة مالك يدوياً وجلب المستخدمين لشاشة تسجيل الدخول
+    authService.createUser({
+      username: 'test_owner',
+      display_name: 'صاحب المحل',
+      password: 'OwnerPass123',
+      pin: '4321',
+      role: USER_ROLES.OWNER,
+    });
     const loginUsers = authService.getLoginUsers();
     expect(loginUsers.length).toBeGreaterThan(0);
     expect(loginUsers[0]).toHaveProperty('id');

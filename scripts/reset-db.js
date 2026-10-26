@@ -4,6 +4,8 @@ const fs = require('fs');
 
 const appData = process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : '/var/local');
 const targetPaths = [
+  path.join(appData, 'cosmetics-pos-system', 'boutique_gouri.db'),
+  path.join(process.cwd(), 'boutique_gouri.db'),
   path.join(appData, 'cosmetics-pos-system', 'cosmetics_pos.db'),
   path.join(process.cwd(), 'cosmetics_pos.db'),
 ];

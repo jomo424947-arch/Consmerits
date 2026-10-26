@@ -219,35 +219,6 @@ export function InitialSetupWizard({ onSetupComplete }: InitialSetupWizardProps)
           >
             يرجى إدخال بيانات متجرك وحساب المسؤول الرئيسي لبدء استخدام نظام المبيعات ونقاط البيع بأمان تام.
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              sounds.playClick();
-              setStoreName('بوتيك جوري - كوزمتكس');
-              setStorePhone('01000000000');
-              setStoreAddress('الفرع الرئيسي');
-              setDisplayName('محمد الجوكر');
-              setUsername('mohamed_joker');
-              setPassword('Joker@Admin2026');
-              setConfirmPassword('Joker@Admin2026');
-              setPin('7777');
-              setError(null);
-            }}
-            style={{
-              marginTop: 8,
-              background: 'rgba(255, 112, 136, 0.08)',
-              border: '1px dashed #FF7088',
-              borderRadius: 8,
-              color: 'var(--color-primary)',
-              fontSize: 11.5,
-              fontWeight: 600,
-              padding: '4px 12px',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            ⚡ تعبئة سريعة لبيانات متجر بوتيك جوري (محمد الجوكر)
-          </button>
         </div>
 
         {/* تنبيه الخطأ عند وجود خطأ بالمدخلات */}

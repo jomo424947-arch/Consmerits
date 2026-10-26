@@ -67,12 +67,11 @@ export class ProductsService {
       const seq = row?.value ?? 1;
       barcode = generateInternalBarcode(seq, '200');
 
-      // التأكد من عدم وجود الباركود مسبقاً (احتياط أمان)
-      const existing = db
+      // التأكد من عدم وجود الباركود مسبقاً (احتياط أمان بدورة تكرار حتى إيجاد باركود شاغر)
+      let existing = db
         .prepare('SELECT id FROM product_barcodes WHERE barcode = ?')
         .get(barcode);
-      if (existing) {
-        // إذا تصادف وجوده، نقفز للرقم التالي
+      while (existing) {
         db.prepare(
           "UPDATE counters SET value = value + 1 WHERE name = 'internal_barcode_seq'"
         ).run();
@@ -80,6 +79,9 @@ export class ProductsService {
           .prepare("SELECT value FROM counters WHERE name = 'internal_barcode_seq'")
           .get() as { value: number };
         barcode = generateInternalBarcode(nextRow.value, '200');
+        existing = db
+          .prepare('SELECT id FROM product_barcodes WHERE barcode = ?')
+          .get(barcode);
       }
     });
 
@@ -457,22 +459,24 @@ export class ProductsService {
               const diff = newStock - batch.qty_remaining;
               if (diff !== 0) {
                 const moveType = diff > 0 ? 'adjust_in' : 'adjust_out';
-                db.prepare('UPDATE batches SET qty_remaining = ? WHERE id = ?').run(newStock, batch.id);
+                // الاعتماد فقط على الـ Trigger (trg_movement_apply) لتحديث الرصيد
+                // لا نعدل qty_remaining مباشرة لتفادي التضاعف
                 db.prepare(`
                   INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
                   VALUES (?, ?, ?, 'manual_adjustment', ?, ?, 'تسوية يدوية للرصيد من تعديل الصنف', datetime('now'))
-                `).run(batch.id, moveType, Math.abs(diff), id, actorUserId ?? null);
+                `).run(batch.id, moveType, diff, id, actorUserId ?? 1);
               }
             } else {
+              // إنشاء دفعة جديدة برصيد 0 ثم إضافة الرصيد عبر حركة مخزون (الـ Trigger يحدث qty_remaining)
               const batchRes = db.prepare(`
                 INSERT INTO batches (variant_id, batch_no, expiry_date, unit_cost, qty_remaining, received_at)
-                VALUES (?, ?, NULL, 0, ?, datetime('now'))
-              `).run(targetVariantId, `B-INIT-${id}`, newStock);
+                VALUES (?, ?, NULL, 0, 0, datetime('now'))
+              `).run(targetVariantId, `B-INIT-${id}`);
               const newBatchId = Number(batchRes.lastInsertRowid);
               db.prepare(`
                 INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
                 VALUES (?, 'adjust_in', ?, 'initial_stock', ?, ?, 'رصيد مخزون من تعديل الصنف', datetime('now'))
-              `).run(newBatchId, newStock, id, actorUserId ?? null);
+              `).run(newBatchId, newStock, id, actorUserId ?? 1);
             }
           }
         }
@@ -562,8 +566,8 @@ export class ProductsService {
 
     const hasHistory = hasSales || hasMovements || hasPurchases;
 
-    if (hasHistory) {
-      // أرشفة آمنة (Soft Delete)
+    // دالة مساعدة للأرشفة الآمنة (Soft Delete)
+    const archiveProduct = (reason: string) => {
       db.transaction(() => {
         db.prepare("UPDATE products SET is_active = 0, updated_at = datetime('now') WHERE id = ?").run(id);
         if (variantIds.length > 0) {
@@ -581,13 +585,18 @@ export class ProductsService {
             entityId: id,
             details: {
               product_name: product.name_ar,
-              reason: 'أرشفة المنتج لوجود حركات مبيعات أو مشتريات سابقة',
+              reason,
               has_sales: hasSales,
               has_movements: hasMovements,
             },
           });
         }
       })();
+    };
+
+    if (hasHistory) {
+      // أرشفة آمنة (Soft Delete)
+      archiveProduct('أرشفة المنتج لوجود حركات مبيعات أو مشتريات سابقة');
 
       return {
         success: true,
@@ -595,58 +604,78 @@ export class ProductsService {
         message: `تم أرشفة المنتج "${product.name_ar}" وإخفاؤه بنجاح نظراً لوجود مبيعات أو مشتريات سابقة مرتبطة به.`,
       };
     } else {
-      // حذف نهائي كامل (Hard Delete)
-      db.transaction(() => {
-        if (variantIds.length > 0) {
-          const placeholders = variantIds.map(() => '?').join(',');
+      // حذف نهائي كامل (Hard Delete) - فقط إذا لم تكن هناك حركات مخزون
+      try {
+        db.transaction(() => {
+          if (variantIds.length > 0) {
+            const placeholders = variantIds.map(() => '?').join(',');
 
-          // 1. حذف حركات المخزون التابعة للـ batches أولاً لتفادي تعارض الـ Foreign Key
-          const batchRows = db
-            .prepare(`SELECT id FROM batches WHERE variant_id IN (${placeholders})`)
-            .all(...variantIds) as { id: number }[];
+            // فحص وجود أي حركات مخزون (الـ trigger يمنع حذفها)
+            const batchRows = db
+              .prepare(`SELECT id FROM batches WHERE variant_id IN (${placeholders})`)
+              .all(...variantIds) as { id: number }[];
 
-          if (batchRows.length > 0) {
-            const bPlaceholders = batchRows.map(() => '?').join(',');
-            db.prepare(`DELETE FROM stock_movements WHERE batch_id IN (${bPlaceholders})`).run(
-              ...batchRows.map((b) => b.id)
-            );
+            if (batchRows.length > 0) {
+              const bPlaceholders = batchRows.map(() => '?').join(',');
+              const movementCount = db
+                .prepare(`SELECT COUNT(*) as cnt FROM stock_movements WHERE batch_id IN (${bPlaceholders})`)
+                .get(...batchRows.map((b) => b.id)) as { cnt: number };
+
+              if (movementCount.cnt > 0) {
+                // يوجد حركات مخزون - لا يمكن حذفها بسبب الـ trigger (append-only)
+                // نرفع خطأ ليتم التقاطه والتحويل للأرشفة
+                throw new Error('FALLBACK_TO_ARCHIVE');
+              }
+            }
+
+            db.prepare(`DELETE FROM product_barcodes WHERE variant_id IN (${placeholders})`).run(...variantIds);
+            db.prepare(`DELETE FROM batches WHERE variant_id IN (${placeholders})`).run(...variantIds);
+
+            try {
+              db.prepare(`DELETE FROM product_price_history WHERE variant_id IN (${placeholders})`).run(...variantIds);
+            } catch {}
+
+            try {
+              db.prepare(`DELETE FROM promotion_items WHERE variant_id IN (${placeholders}) OR product_id = ?`).run(...variantIds, id);
+            } catch {}
+
+            db.prepare(`DELETE FROM product_variants WHERE product_id = ?`).run(id);
           }
 
-          db.prepare(`DELETE FROM product_barcodes WHERE variant_id IN (${placeholders})`).run(...variantIds);
-          db.prepare(`DELETE FROM batches WHERE variant_id IN (${placeholders})`).run(...variantIds);
+          db.prepare('DELETE FROM products WHERE id = ?').run(id);
 
-          try {
-            db.prepare(`DELETE FROM product_price_history WHERE variant_id IN (${placeholders})`).run(...variantIds);
-          } catch {}
+          if (actorUserId) {
+            this.auditService.log({
+              userId: actorUserId,
+              action: 'DELETE_PRODUCT',
+              entityType: 'products',
+              entityId: id,
+              details: {
+                product_name: product.name_ar,
+                note: 'حذف نهائي لعدم وجود أي مبيعات أو حركات مخزون سابقة',
+              },
+            });
+          }
+        })();
 
-          try {
-            db.prepare(`DELETE FROM promotion_items WHERE variant_id IN (${placeholders}) OR product_id = ?`).run(...variantIds, id);
-          } catch {}
-
-          db.prepare(`DELETE FROM product_variants WHERE product_id = ?`).run(id);
+        return {
+          success: true,
+          action: 'deleted',
+          message: `تم حذف المنتج "${product.name_ar}" نهائياً من قاعدة البيانات بنجاح.`,
+        };
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // التحويل التلقائي للأرشفة عند فشل الحذف النهائي (بسبب triggers أو foreign keys)
+        if (errMsg === 'FALLBACK_TO_ARCHIVE' || errMsg.includes('append-only') || errMsg.includes('FOREIGN KEY')) {
+          archiveProduct('أرشفة تلقائية - تعذر الحذف النهائي لوجود حركات مرتبطة');
+          return {
+            success: true,
+            action: 'archived',
+            message: `تم أرشفة المنتج "${product.name_ar}" وإخفاؤه بنجاح (تعذر الحذف النهائي لوجود بيانات مرتبطة).`,
+          };
         }
-
-        db.prepare('DELETE FROM products WHERE id = ?').run(id);
-
-        if (actorUserId) {
-          this.auditService.log({
-            userId: actorUserId,
-            action: 'DELETE_PRODUCT',
-            entityType: 'products',
-            entityId: id,
-            details: {
-              product_name: product.name_ar,
-              note: 'حذف نهائي لعدم وجود أي مبيعات أو حركات مخزون سابقة',
-            },
-          });
-        }
-      })();
-
-      return {
-        success: true,
-        action: 'deleted',
-        message: `تم حذف المنتج "${product.name_ar}" نهائياً من قاعدة البيانات بنجاح.`,
-      };
+        throw err;
+      }
     }
   }
 

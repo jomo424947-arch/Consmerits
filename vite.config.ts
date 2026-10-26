@@ -48,5 +48,7 @@ export default defineConfig({
   build: {
     outDir: '../../dist',
     emptyOutDir: true,
+    target: 'chrome108',
+    cssTarget: 'chrome108',
   },
 });

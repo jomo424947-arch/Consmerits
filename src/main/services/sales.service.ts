@@ -104,10 +104,14 @@ export class SalesService {
 
       if (remainingNeeded > 0) {
         const fallbackBatch = this.getOrCreateBatch(variantId, 0, txDb);
-        // تحديث الرصيد لتفادي CHECK (qty_remaining >= 0)
+        // تسجيل حركة مخزون رسمية لإضافة الرصيد الوهمي بدلاً من تعديل مباشر
+        // الـ trigger (trg_movement_apply) سيرفع qty_remaining تلقائياً
         txDb
-          .prepare('UPDATE batches SET qty_remaining = qty_remaining + ? WHERE id = ?')
-          .run(remainingNeeded, fallbackBatch.id);
+          .prepare(`
+            INSERT INTO stock_movements (batch_id, type, qty, ref_type, ref_id, user_id, note, created_at)
+            VALUES (?, 'adjust_in', ?, 'zero_stock_sale', NULL, 1, 'رصيد وهمي للبيع من رصيد صفر - يحتاج تسوية', datetime('now'))
+          `)
+          .run(fallbackBatch.id, remainingNeeded);
         allocations.push({ batch_id: fallbackBatch.id, qty: remainingNeeded, unit_cost: 0 });
       }
 

@@ -235,18 +235,31 @@ export class ReturnsService {
     const db = this.getDb();
     const salesService = new SalesService(db, this.auditService);
 
-    // 1. تنفيذ المرتجع مع ضبط طريقة الرد على 'exchange'
-    const returnInvoice = this.createReturnInternal(
-      {
-        ...input.return_input,
-        refund_method: 'exchange',
-      },
-      db
-    );
+    // 1. التحقق الاستباقي من الوردية
+    let targetShiftId = input.shift_id;
+    if (!targetShiftId) {
+      const openShift = db
+        .prepare("SELECT id FROM shifts WHERE status = 'open' ORDER BY id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!openShift) {
+        throw new Error('لا توجد وردية مفتوحة حالياً لتنفيذ عملية الاستبدال');
+      }
+      targetShiftId = openShift.id;
+    } else {
+      const shift = db
+        .prepare("SELECT id, status FROM shifts WHERE id = ? AND status = 'open'")
+        .get(targetShiftId) as { id: number; status: string } | undefined;
+      if (!shift) {
+        throw new Error(`الوردية رقم ${targetShiftId} غير موجودة أو مغلقة`);
+      }
+    }
 
-    const refundAmount = returnInvoice.total_refund;
+    // 2. التحقق الاستباقي من الأصناف الجديدة ورصيد المخزون
+    const zeroStockSetting = db
+      .prepare("SELECT value FROM settings WHERE key = 'allow_zero_stock_sale'")
+      .get() as { value: string } | undefined;
+    const allowZeroStock = zeroStockSetting?.value === '1';
 
-    // 2. حساب إجمالي الأصناف الجديدة المراد شراؤها
     let newSaleSubtotal = 0;
     const saleCartItems: Array<{
       variant_id: number;
@@ -264,6 +277,15 @@ export class ReturnsService {
         throw new Error(`الصنف الجديد رقم ${item.variant_id} غير موجود`);
       }
 
+      if (!allowZeroStock) {
+        const stockRow = db
+          .prepare('SELECT COALESCE(SUM(qty_remaining), 0) as totalStock FROM batches WHERE variant_id = ?')
+          .get(item.variant_id) as { totalStock: number };
+        if (stockRow.totalStock < item.qty) {
+          throw new Error(`الرصيد المتاح للصنف ${item.variant_id} (${stockRow.totalStock}) لا يكفي للكمية المطلوبة (${item.qty})`);
+        }
+      }
+
       const itemTotal = variant.sale_price * item.qty - (item.discount_amount ?? 0);
       newSaleSubtotal += itemTotal;
       saleCartItems.push({
@@ -274,7 +296,18 @@ export class ReturnsService {
       });
     }
 
-    // 3. تحديد فرق السعر والتسوية المالية
+    // 3. تنفيذ المرتجع مع ضبط طريقة الرد على 'exchange'
+    const returnInvoice = this.createReturnInternal(
+      {
+        ...input.return_input,
+        refund_method: 'exchange',
+      },
+      db
+    );
+
+    const refundAmount = returnInvoice.total_refund;
+
+    // 4. تحديد فرق السعر والتسوية المالية
     const priceDifference = newSaleSubtotal - refundAmount;
     let newSaleId: number | undefined;
     let actionTaken: 'customer_paid' | 'customer_refunded' | 'even_exchange';
@@ -301,26 +334,16 @@ export class ReturnsService {
       });
 
       const excessRefund = Math.abs(priceDifference);
-      let targetShiftId = input.shift_id;
-      if (!targetShiftId) {
-        const openShift = db
-          .prepare("SELECT id FROM shifts WHERE status = 'open' ORDER BY id DESC LIMIT 1")
-          .get() as { id: number } | undefined;
-        targetShiftId = openShift?.id;
-      }
-
-      if (targetShiftId) {
-        db.prepare(`
-          INSERT INTO cash_movements (shift_id, user_id, type, amount, ref_type, ref_id, note, created_at)
-          VALUES (?, ?, 'refund', ?, 'exchange_diff', ?, ?, datetime('now'))
-        `).run(
-          targetShiftId,
-          input.user_id,
-          -excessRefund,
-          returnInvoice.id,
-          `رد فرق استبدال بضاعة لمرتجع #${returnInvoice.id}`
-        );
-      }
+      db.prepare(`
+        INSERT INTO cash_movements (shift_id, user_id, type, amount, ref_type, ref_id, note, created_at)
+        VALUES (?, ?, 'refund', ?, 'exchange_diff', ?, ?, datetime('now'))
+      `).run(
+        targetShiftId,
+        input.user_id,
+        -excessRefund,
+        returnInvoice.id,
+        `رد فرق استبدال بضاعة لمرتجع #${returnInvoice.id}`
+      );
     } else {
       // تعادل متساوي
       actionTaken = 'even_exchange';
@@ -330,16 +353,8 @@ export class ReturnsService {
       });
     }
 
-    // 4. إنشاء فاتورة المبيعات الجديدة إذا وُجدت أصناف
+    // 5. إنشاء فاتورة المبيعات الجديدة إذا وُجدت أصناف
     if (saleCartItems.length > 0) {
-      let shiftId = input.shift_id;
-      if (!shiftId) {
-        const openShift = db
-          .prepare("SELECT id FROM shifts WHERE status = 'open' ORDER BY id DESC LIMIT 1")
-          .get() as { id: number } | undefined;
-        shiftId = openShift ? openShift.id : 1;
-      }
-
       const newSale = await salesService.createSale(
         {
           items: saleCartItems,
@@ -348,7 +363,7 @@ export class ReturnsService {
           notes: `استبدال مرتبط بمرتجع #${returnInvoice.id}`,
         },
         input.user_id,
-        shiftId
+        targetShiftId
       );
       newSaleId = newSale.id;
     }

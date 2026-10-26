@@ -25,18 +25,36 @@ interface MigrationFile {
 
 /**
  * تحديد مسار مجلد الـ migrations المناسب
+ * في بيئة التشغيل المعبأة (packaged) يتم البحث في process.resourcesPath
+ * في بيئة التطوير يتم البحث في مسارات المصدر
  */
 function resolveMigrationsDir(customDir?: string): string {
   if (customDir && fs.existsSync(customDir)) {
     return customDir;
   }
 
-  const candidatePaths = [
+  let isPackaged = false;
+  try {
+    const { app } = require('electron');
+    isPackaged = app?.isPackaged ?? false;
+  } catch {
+    // بيئة الاختبارات أو بيئة Node العادية
+  }
+
+  const candidatePaths: string[] = [];
+
+  // 1. مسار الموارد المعبأة (resources/migrations)
+  if (typeof process !== 'undefined' && process.resourcesPath) {
+    candidatePaths.push(path.join(process.resourcesPath, 'migrations'));
+  }
+
+  // 2. مسارات التطبيق وحزم asar والتطوير
+  candidatePaths.push(
     path.join(__dirname, 'migrations'),
     path.join(__dirname, 'db', 'migrations'),
-    path.resolve(process.cwd(), 'src', 'main', 'db', 'migrations'),
     path.resolve(process.cwd(), 'dist-electron', 'main', 'migrations'),
-  ];
+    path.resolve(process.cwd(), 'src', 'main', 'db', 'migrations'),
+  );
 
   for (const candidate of candidatePaths) {
     if (fs.existsSync(candidate)) {
@@ -44,8 +62,9 @@ function resolveMigrationsDir(customDir?: string): string {
     }
   }
 
+  const checkedPathsList = candidatePaths.map((p, i) => `  ${i + 1}. ${p}`).join('\n');
   throw new Error(
-    `تعذر العثور على مجلد الترحيلات (migrations). المسارات المفحوصة: ${candidatePaths.join(', ')}`
+    `تعذر العثور على مجلد الترحيلات (migrations). المسارات المفحوصة:\n${checkedPathsList}`
   );
 }
 

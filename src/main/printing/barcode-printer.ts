@@ -368,22 +368,27 @@ export class BarcodePrinter {
         return this.printersCache?.data || [];
       }
 
-      const rawPrinters = await win.webContents.getPrintersAsync();
+      const rawPrinters = win.webContents.getPrinters();
 
       // فحص حالة الاتصال الفعلية لويندوز (WorkOffline) بشكل غير متزامن لتفادي تجميد الـ Event Loop
       const offlineSet = new Set<string>();
       if (process.platform === 'win32') {
         try {
+          // متوافق مع Windows 7 (PowerShell 2.0) — بدون ConvertTo-Json أو Get-CimInstance
           const { stdout } = await execAsync(
-            'powershell -NoProfile -Command "Get-CimInstance Win32_Printer | Select-Object Name, WorkOffline | ConvertTo-Json"',
+            'powershell -NoProfile -Command "Get-WmiObject Win32_Printer | ForEach-Object { $_.Name + \\\"=\\\" + $_.WorkOffline }"',
             { timeout: 1500 }
           );
           if (stdout && stdout.trim()) {
-            const parsed = JSON.parse(stdout);
-            const list = Array.isArray(parsed) ? parsed : [parsed];
-            for (const item of list) {
-              if (item && item.WorkOffline === true && item.Name) {
-                offlineSet.add(item.Name.toLowerCase().trim());
+            const lines = stdout.trim().split(/\r?\n/);
+            for (const line of lines) {
+              const eqIdx = line.lastIndexOf('=');
+              if (eqIdx > 0) {
+                const name = line.substring(0, eqIdx).trim();
+                const offline = line.substring(eqIdx + 1).trim().toLowerCase();
+                if (offline === 'true' && name) {
+                  offlineSet.add(name.toLowerCase());
+                }
               }
             }
           }
@@ -494,14 +499,16 @@ export class BarcodePrinter {
 
     try {
       if (process.platform === 'win32') {
+        // استخدام WMI بدلاً من PrintManagement module للتوافق مع Windows 7
+        // Get-PrintJob / Get-Printer / Remove-PrintJob غير متوفرة في Windows 7 (تحتاج Windows 8+)
         if (printerName) {
           const sanitized = printerName.replace(/["';`$]/g, '');
           await execAsync(
-            `powershell -NoProfile -Command "Get-PrintJob -PrinterName '${sanitized}' -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue"`
+            `powershell -NoProfile -Command "Get-WmiObject Win32_PrintJob -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '${sanitized}*' } | ForEach-Object { $_.Delete() }"`
           );
         } else {
           await execAsync(
-            `powershell -NoProfile -Command "Get-Printer | ForEach-Object { Get-PrintJob -PrinterName $_.Name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue }"`
+            `powershell -NoProfile -Command "Get-WmiObject Win32_PrintJob -ErrorAction SilentlyContinue | ForEach-Object { $_.Delete() }"`
           );
         }
       }

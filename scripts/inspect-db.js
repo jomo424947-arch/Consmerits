@@ -26,6 +26,12 @@ function formatBytes(bytes) {
 
 function findDefaultDb() {
   const appData = process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : '/var/local');
+  const appDataGouri = path.join(appData, 'cosmetics-pos-system', 'boutique_gouri.db');
+  if (fs.existsSync(appDataGouri)) return appDataGouri;
+
+  const localGouri = path.join(process.cwd(), 'boutique_gouri.db');
+  if (fs.existsSync(localGouri)) return localGouri;
+
   const appDataDb = path.join(appData, 'cosmetics-pos-system', 'cosmetics_pos.db');
   if (fs.existsSync(appDataDb)) return appDataDb;
 
